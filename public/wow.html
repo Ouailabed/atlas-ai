@@ -484,7 +484,9 @@ function updateOverlays(scene,prog){
 const trailLen=8;
 const orbTrails=[];
 for(let i=0;i<5;i++){
-  orbTrails.push(Array.from({length:trailLen},()=>({x:0,y:0})));
+  // k is the perspective scale the 3D orbital renderer multiplies by. Seeding
+  // without it produced NaN radii for the first `trailLen` frames.
+  orbTrails.push(Array.from({length:trailLen},()=>({x:0,y:0,k:0})));
 }
 
 // ── NEURAL NODE POSITIONS ─────────────────────────────────────────────────────
@@ -513,6 +515,23 @@ const taskCards=[
 const cardTriggers=[0.1,0.25,0.4,0.55,0.7,0.85];
 
 // ── DRAW ──────────────────────────────────────────────────────────────────────
+// ── HERO ORBIT SHELL ─────────────────────────────────────────────────────────
+// A shell of points on a sphere, distributed with the Fibonacci spiral so they
+// are evenly spaced rather than bunched at the poles. The hero art is a flat
+// photograph and cannot truly be orbited, but rotating a real 3D shell around
+// the sphere in the artwork produces genuine parallax — near points sweep across
+// faster and brighter than far ones — which is what reads as camera movement.
+const SHELL_N=260, shellPts=[];
+(function buildShell(){
+  const golden=Math.PI*(3-Math.sqrt(5));
+  for(let i=0;i<SHELL_N;i++){
+    const y=1-(i/(SHELL_N-1))*2;
+    const rad=Math.sqrt(Math.max(0,1-y*y));
+    const th=golden*i;
+    shellPts.push({x:Math.cos(th)*rad, y, z:Math.sin(th)*rad, s:Math.random()*0.6+0.4});
+  }
+})();
+
 let lastFrameT=performance.now();
 function draw(){
   requestAnimationFrame(draw);
@@ -550,8 +569,13 @@ function draw(){
   const heroImg=document.getElementById('hero-img');
   if(scene===0){
     const zoomProg=Math.min(1,gp/(0.14*0.43)); // reaches 1.0 at 6% of total
-    const scale=lerp(1.0,1.18,zoomProg);
-    heroImg.style.transform=`scale(${scale})`;
+    const scale=lerp(1.02,1.24,zoomProg);
+    // Lateral drift plus a fraction of a degree of roll. On its own a straight
+    // zoom reads as a static photo being enlarged; adding the sideways travel
+    // and roll makes it read as a camera arcing past the subject.
+    const arc=lerp(-2.2,2.2,prog);
+    const roll=lerp(-0.55,0.55,prog);
+    heroImg.style.transform=`translate3d(${arc}%,${-arc*0.14}%,0) rotate(${roll}deg) scale(${scale})`;
     heroImg.style.opacity=prog>0.7?lerp(1,0,(prog-0.7)/0.3):1;
   } else {
     heroImg.style.opacity='0';
@@ -639,50 +663,171 @@ function draw(){
     ctx.fill(path);
   }
 
-  // ── SCENE 2 — ORBITAL ────────────────────────────────────────────────────
+  // ── SCENE 1 — HERO ORBIT SHELL ───────────────────────────────────────────
+  if(scene===0){
+    const sx=W*0.62, sy=H*0.46;                 // sphere centre within the art
+    const R=Math.min(W,H)*0.34;
+    const yaw=prog*1.9+time*0.05;               // scroll drives the orbit
+    const pitch=-0.20;
+    const cY=Math.cos(yaw),  sY=Math.sin(yaw);
+    const cP=Math.cos(pitch),sP=Math.sin(pitch);
+
+    // Fades in as the hero settles and out as the scene hands over, so it never
+    // fights the headline on arrival.
+    const shellAlpha=Math.min(1,prog/0.18)*(prog>0.62?Math.max(0,1-(prog-0.62)/0.28):1);
+
+    if(shellAlpha>0.01){
+      for(let i=0;i<SHELL_N;i++){
+        const q=shellPts[i];
+        const X=q.x*cY - q.z*sY;
+        let Z=q.x*sY + q.z*cY;
+        const Y=q.y*cP - Z*sP;
+        Z=q.y*sP + Z*cP;
+
+        // Z spans -1..1; map to a depth factor so the near face is larger,
+        // brighter and warmer than the far face.
+        const near=(Z+1)*0.5;
+        const px2=sx+X*R, py2=sy+Y*R;
+        if(px2<-20||px2>W+20||py2<-20||py2>H+20) continue;
+
+        const a=(0.05+near*0.42)*q.s*shellAlpha;
+        const rad=(0.5+near*1.9)*q.s;
+        ctx.beginPath();
+        ctx.arc(px2,py2,rad,0,Math.PI*2);
+        ctx.fillStyle=`rgba(${Math.round(190+near*60)},${Math.round(165+near*70)},${Math.round(110+near*80)},${a})`;
+        ctx.fill();
+      }
+    }
+  }
+
+  // ── SCENE 2 — ORBITAL (true 3D) ──────────────────────────────────────────
+  // Rebuilt from flat 2D circles to real perspective projection.
+  //
+  // Each orbit is a circle in 3D space with its own inclination, and the whole
+  // system is viewed through a camera whose yaw is driven by scroll — so
+  // scrolling through this scene physically swings the camera around the
+  // system. Nodes scale and dim with depth and pass behind the core, which is
+  // what sells it as a space rather than a diagram.
   if(scene===1){
-    const cx=W*0.6,cy=H*0.5;
+    const cx=W*0.6, cy=H*0.5;
     const radii=[W*0.12,W*0.2,W*0.28,W*0.36,W*0.44];
     const labels=['Gmail','Calendar','Notion','Slack','Finance'];
     const speeds=[0.5,0.38,0.28,0.2,0.14];
+    const tilts=[0.34,0.52,0.26,0.62,0.42];   // inclination per orbit, radians
+    const FOV=Math.max(W,H)*1.15;
 
-    // Center Atlas glow
-    const cPulse=0.5+Math.sin(time*2)*0.5;
-    const cGrd=ctx.createRadialGradient(cx,cy,0,cx,cy,40+cPulse*10);
-    cGrd.addColorStop(0,'rgba(201,168,76,0.4)');
-    cGrd.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=cGrd;ctx.beginPath();ctx.arc(cx,cy,40+cPulse*10,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc(cx,cy,12,0,Math.PI*2);ctx.fillStyle='rgba(201,168,76,0.9)';ctx.fill();
-    ctx.fillStyle='rgba(26,26,26,0.9)';ctx.font='bold 10px Segoe UI';ctx.textAlign='center';ctx.textBaseline='middle';
+    // Camera. Scroll drives the swing; `time` adds a slow idle drift so the
+    // scene is never completely static when the reader stops moving.
+    const camYaw   = prog*1.25 + time*0.06;
+    const camPitch = -0.30 - prog*0.10;
+    const cosY=Math.cos(camYaw),  sinY=Math.sin(camYaw);
+    const cosP=Math.cos(camPitch),sinP=Math.sin(camPitch);
+
+    // World -> screen. Returns null for anything behind the camera plane.
+    function proj(x,y,z){
+      let X = x*cosY - z*sinY;
+      let Z = x*sinY + z*cosY;
+      const Y = y*cosP - Z*sinP;
+      Z = y*sinP + Z*cosP;
+      const d = Z + FOV;
+      if(d < 1) return null;
+      const k = FOV/d;
+      return { x: cx + X*k, y: cy + Y*k, k, d };
+    }
+
+    // A point on orbit i at angle a: circle in the XZ plane, tilted about X.
+    function orbitPoint(i,a){
+      const r=radii[i], t=tilts[i];
+      const ox=Math.cos(a)*r, oz=Math.sin(a)*r;
+      return proj(ox, -oz*Math.sin(t), oz*Math.cos(t));
+    }
+
+    const coreDepth = (proj(0,0,0)||{d:FOV}).d;
+
+    // ── rings ──────────────────────────────────────────────────────────────
+    // Drawn segment by segment so the far half can fade — a single stroked
+    // ellipse would read as flat no matter how it is projected.
+    const SEG=84;
+    for(let i=0;i<radii.length;i++){
+      let prev=null;
+      for(let sIdx=0;sIdx<=SEG;sIdx++){
+        const pt=orbitPoint(i, sIdx/SEG*Math.PI*2);
+        if(pt&&prev){
+          const behind=(pt.d+prev.d)*0.5 > coreDepth;
+          ctx.beginPath();
+          ctx.moveTo(prev.x,prev.y);
+          ctx.lineTo(pt.x,pt.y);
+          ctx.strokeStyle=`rgba(201,168,76,${behind?0.14:0.42})`;
+          ctx.lineWidth=behind?0.7:1.1;
+          ctx.stroke();
+        }
+        prev=pt;
+      }
+    }
+
+    // ── nodes, depth sorted ────────────────────────────────────────────────
+    const nodes=[];
+    for(let i=0;i<radii.length;i++){
+      const a=time*speeds[i];
+      const pt=orbitPoint(i,a);
+      if(!pt) continue;
+
+      const trail=orbTrails[i];
+      trail.unshift({x:pt.x,y:pt.y,k:pt.k});
+      if(trail.length>trailLen) trail.pop();
+
+      nodes.push({ i, pt, trail, label:labels[i] });
+    }
+    nodes.sort((a,b)=>b.pt.d-a.pt.d);   // far first
+
+    function drawNode(n){
+      const {pt,trail,label}=n;
+      // Depth fade: 1 at the front of the system, ~0.3 at the back.
+      const depthMix=Math.max(0,Math.min(1,(coreDepth*1.5-pt.d)/(coreDepth*0.9)));
+      const alpha=0.3+depthMix*0.7;
+
+      for(let ti=trail.length-1;ti>=0;ti--){
+        const t=trail[ti], f=1-ti/trailLen;
+        const rr=4*f*(t.k||0);
+        if(!(rr>0)) continue;              // skip unseeded / degenerate entries
+        ctx.beginPath();
+        ctx.arc(t.x,t.y,rr,0,Math.PI*2);
+        ctx.fillStyle=`rgba(201,168,76,${f*0.55*alpha})`;
+        ctx.fill();
+      }
+
+      const g=ctx.createRadialGradient(pt.x,pt.y,0,pt.x,pt.y,16*pt.k);
+      g.addColorStop(0,`rgba(201,168,76,${0.45*alpha})`);
+      g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g;
+      ctx.beginPath();ctx.arc(pt.x,pt.y,16*pt.k,0,Math.PI*2);ctx.fill();
+
+      ctx.beginPath();ctx.arc(pt.x,pt.y,4.5*pt.k,0,Math.PI*2);
+      ctx.fillStyle=`rgba(235,215,150,${alpha})`;ctx.fill();
+
+      // Label rides with its node instead of sitting statically at the top.
+      ctx.fillStyle=`rgba(255,255,255,${0.22+depthMix*0.6})`;
+      ctx.font=`${Math.max(9,11*pt.k)}px Segoe UI`;
+      ctx.textAlign='center';ctx.textBaseline='bottom';
+      ctx.fillText(label, pt.x, pt.y-13*pt.k);
+    }
+
+    nodes.filter(n=>n.pt.d>coreDepth).forEach(drawNode);   // behind the core
+
+    // ── core ───────────────────────────────────────────────────────────────
+    const pulse=0.5+Math.sin(time*2)*0.5;
+    const cg=ctx.createRadialGradient(cx,cy,0,cx,cy,46+pulse*12);
+    cg.addColorStop(0,'rgba(201,168,76,0.42)');
+    cg.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=cg;
+    ctx.beginPath();ctx.arc(cx,cy,46+pulse*12,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(cx,cy,12,0,Math.PI*2);
+    ctx.fillStyle='rgba(201,168,76,0.95)';ctx.fill();
+    ctx.fillStyle='rgba(26,26,26,0.9)';ctx.font='bold 10px Segoe UI';
+    ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.fillText('ATLAS',cx,cy);
 
-    radii.forEach((r,i)=>{
-      // Ring
-      ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
-      ctx.strokeStyle=`rgba(201,168,76,0.5)`;ctx.lineWidth=1;ctx.stroke();
-
-      // Label at top
-      ctx.fillStyle='rgba(255,255,255,0.7)';ctx.font='11px Segoe UI';
-      ctx.textAlign='center';ctx.textBaseline='bottom';
-      ctx.fillText(labels[i],cx,cy-r-6);
-
-      // Traveling dot with trail
-      const angle=time*speeds[i];
-      const trail=orbTrails[i];
-      // Update trail
-      trail.unshift({x:cx+Math.cos(angle)*r,y:cy+Math.sin(angle)*r});
-      if(trail.length>trailLen)trail.pop();
-      // Draw trail
-      trail.forEach((pt,ti)=>{
-        const top=1-ti/trailLen;
-        ctx.beginPath();ctx.arc(pt.x,pt.y,4*top,0,Math.PI*2);
-        ctx.fillStyle=`rgba(201,168,76,${top*0.8})`;ctx.fill();
-      });
-      // Glow around head
-      const grd=ctx.createRadialGradient(trail[0].x,trail[0].y,0,trail[0].x,trail[0].y,12);
-      grd.addColorStop(0,'rgba(201,168,76,0.4)');grd.addColorStop(1,'rgba(0,0,0,0)');
-      ctx.fillStyle=grd;ctx.beginPath();ctx.arc(trail[0].x,trail[0].y,12,0,Math.PI*2);ctx.fill();
-    });
+    nodes.filter(n=>n.pt.d<=coreDepth).forEach(drawNode);  // in front of the core
   }
 
   // ── SCENE 3 — TASK CARDS ─────────────────────────────────────────────────
