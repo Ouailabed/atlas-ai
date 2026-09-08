@@ -4,11 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ATLAS — Your Personal AI. Always Working.</title>
+<!-- The hero is a 1.5MB background-image. Without preloading it, the first
+     paint is an empty stage and the page reads as broken. -->
+<link rel="preload" as="image" href="atlas-hero.png">
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html, body { background:#0a0806; color:#1a1a1a; font-family:'Segoe UI','Helvetica Neue',system-ui,sans-serif; overflow-x:hidden; cursor:none; }
 #scroll-driver { height:800vh; position:relative; }
-#stage { position:fixed; top:0; left:0; width:100%; height:100%; overflow:hidden; }
+#stage { position:fixed; top:0; left:0; width:100%; height:100%; overflow:hidden;
+         /* Hero art is cream. Painting the stage dark first caused a visible
+            dark->light flash before the image decoded. */
+         background:#efe9e0; }
 #c { position:absolute; top:0; left:0; width:100%; height:100%; }
 #hero-img { position:absolute; top:-10%; left:-10%; width:120%; height:120%; background-image:url('atlas-hero.png'); background-size:cover; background-position:20% center; transform-origin:center center; will-change:transform; }
 #cur { position:fixed; width:10px; height:10px; background:#c9a84c; border-radius:50%; pointer-events:none; z-index:9999; transform:translate(-50%,-50%); }
@@ -40,6 +46,27 @@ nav.dark .nbtn { background:rgba(201,168,76,0.9); color:#1a1a1a; }
 .scene-overlay.right { justify-content:flex-end; }
 .scene-overlay.center { justify-content:center; text-align:center; }
 .scene-text { max-width:520px; pointer-events:all; }
+
+/* Scene 1 must never depend on the rAF loop having run. Previously every
+   .scene-overlay sat at opacity:0 until draw() painted its first frame, so the
+   page looked blank on arrival. Scene 1 now starts visible in CSS and animates
+   itself in, independent of JS. */
+#sc1 { opacity:1; }
+
+/* Readable by default. The hidden-then-animate state is opted INTO below, so a
+   reader can never end up staring at invisible text if the animation does not
+   run — which is the exact failure this whole change is fixing. */
+#sc1 .scene-text > * { opacity:1; transform:none; }
+
+@media (prefers-reduced-motion: no-preference) {
+  #sc1 .scene-text > * { opacity:0; transform:translateY(26px); animation:heroIn 1.15s cubic-bezier(0.16,1,0.3,1) both; }
+  #sc1 .s-badge  { animation-delay:0.10s; }
+  #sc1 .s-h      { animation-delay:0.24s; }
+  #sc1 .s-p      { animation-delay:0.40s; }
+  #sc1 .s-btns   { animation-delay:0.56s; }
+  #sc1 .scene-text > p:last-child { animation-delay:0.70s; }
+}
+@keyframes heroIn { to { opacity:1; transform:translateY(0); } }
 .s-badge { display:inline-flex; align-items:center; gap:10px; background:rgba(201,168,76,0.1); border:1px solid rgba(201,168,76,0.25); border-radius:999px; padding:8px 20px; margin-bottom:28px; }
 .s-badge-dot { width:5px; height:5px; border-radius:50%; background:#c9a84c; animation:pd 2s infinite; }
 .s-badge span { font-size:11px; letter-spacing:3px; text-transform:uppercase; color:#c9a84c; }
@@ -436,8 +463,12 @@ function updateOverlays(scene,prog){
     if(!el)continue;
     let op=0;
     if(i===scene){
-      if(prog<0.15) op=prog/0.15;
-      else if(prog>0.82) op=1-(prog-0.82)/0.18;
+      // Scene 0 at scroll 0 used to compute prog/0.15 = 0, so the hero copy was
+      // invisible until you scrolled and the page looked empty. The first scene
+      // is fully visible at rest; CSS handles its entrance.
+      if(prog>0.82) op=1-(prog-0.82)/0.18;
+      else if(scene===0) op=1;
+      else if(prog<0.15) op=prog/0.15;
       else op=1;
     }
     el.style.opacity=op;
@@ -482,11 +513,22 @@ const taskCards=[
 const cardTriggers=[0.1,0.25,0.4,0.55,0.7,0.85];
 
 // ── DRAW ──────────────────────────────────────────────────────────────────────
+let lastFrameT=performance.now();
 function draw(){
   requestAnimationFrame(draw);
-  time+=0.01;
 
-  lerpScroll=lerp(lerpScroll,scrollY,0.06);
+  // Frames elapsed since the last paint, capped so returning from a background
+  // tab does not teleport the scene. The old code advanced by a fixed amount
+  // per frame, so everything ran ~2.4x faster on a 144Hz display than on 60Hz —
+  // which is a large part of why the scroll felt inconsistent.
+  const nowT=performance.now();
+  const dt=Math.min((nowT-lastFrameT)/16.667,4);
+  lastFrameT=nowT;
+  time+=0.01*dt;
+
+  // Exponential damping toward the real scroll position. Expressed this way the
+  // easing is identical at any refresh rate.
+  lerpScroll+=(scrollY-lerpScroll)*(1-Math.pow(1-0.085,dt));
   const dh=DRIVER_H()||1;
   const gp=Math.min(1,lerpScroll/dh);
   const rawScene=gp*SCENES;
@@ -559,17 +601,42 @@ function draw(){
   }
 
   // ── DRAW PARTICLES ────────────────────────────────────────────────────────
+  // Batched into Path2D buckets by colour and quantised alpha.
+  //
+  // The previous version ran beginPath + arc + a template-string fillStyle +
+  // fill for each of the 2500 particles, every frame: 2500 string allocations
+  // and 2500 canvas state changes. That was the single biggest cost in the
+  // frame and the main reason scrolling felt heavy. One pass over the particles
+  // plus at most 5 x 6 fills replaces it, with no visible difference.
   const colors=[
     [201,168,76],[240,236,230],[180,160,120],[220,200,140],[255,245,200]
   ];
+  const A_STEPS=6;
+  const baseOp=scene===0?0.25:0.65;
+  const buckets=new Array(colors.length*A_STEPS);
+
   for(let i=0;i<N;i++){
     if(px[i]<-5||px[i]>W+5||py[i]<-5||py[i]>H+5)continue;
-    const [r,g,b]=colors[Math.min(pcol[i],4)];
-    const op=pop[i]*(scene===0?0.25:0.65);
-    const sz=Math.max(1,Math.min(2.5,pr[i]));
-    ctx.beginPath();ctx.arc(px[i],py[i],sz,0,Math.PI*2);
+    const c=pcol[i]<4?pcol[i]:4;
+    // pop[i] spans 0.1..0.6; map it across the alpha buckets.
+    let a=Math.round((pop[i]-0.1)/0.5*(A_STEPS-1));
+    if(a<0)a=0; else if(a>A_STEPS-1)a=A_STEPS-1;
+    const k=c*A_STEPS+a;
+    let path=buckets[k];
+    if(path===undefined)path=buckets[k]=new Path2D();
+    const sz=pr[i]<1?1:(pr[i]>2.5?2.5:pr[i]);
+    // moveTo before arc, or Path2D joins each circle to the previous one.
+    path.moveTo(px[i]+sz,py[i]);
+    path.arc(px[i],py[i],sz,0,Math.PI*2);
+  }
+
+  for(let k=0;k<buckets.length;k++){
+    const path=buckets[k];
+    if(path===undefined)continue;
+    const [r,g,b]=colors[(k/A_STEPS)|0];
+    const op=(0.1+(k%A_STEPS)/(A_STEPS-1)*0.5)*baseOp;
     ctx.fillStyle=`rgba(${r},${g},${b},${op})`;
-    ctx.fill();
+    ctx.fill(path);
   }
 
   // ── SCENE 2 — ORBITAL ────────────────────────────────────────────────────
