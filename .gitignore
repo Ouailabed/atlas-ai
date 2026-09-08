@@ -1,4 +1,10 @@
-﻿node_modules/
+node_modules/
 .next/
-.env*
 *.log
+
+# Never commit real secrets.
+.env*
+
+# ...but DO commit the template, which contains no real values.
+# This exception must come after the .env* rule above to take effect.
+!.env.local.template

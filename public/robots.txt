@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Allow: /wow.html
+
+# Authenticated areas — no value in indexing, and they redirect to /login anyway.
+Disallow: /dashboard
+Disallow: /atlas
+Disallow: /jobs
+Disallow: /settings
+Disallow: /onboarding
+Disallow: /api/
+
+Sitemap: https://atlas-ai.vercel.app/sitemap.xml

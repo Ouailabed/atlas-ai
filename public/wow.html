@@ -158,11 +158,12 @@ nav.dark .nbtn { background:rgba(201,168,76,0.9); color:#1a1a1a; }
       <h1 class="s-h dark-h" style="font-size:clamp(60px,7.5vw,100px)">Your Personal AI.<br><span class="gold">Always Working.</span></h1>
       <p class="s-p dark-p">Atlas handles your emails, calendar, job applications, finances, and daily decisions — so you can focus on the things that actually matter to you.</p>
       <div class="s-btns">
-        <button class="btn-d">
+        <button class="btn-d" onclick="atlasWaitlist()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           Join Waitlist
         </button>
         <button class="btn-o">Watch Demo</button>
+        <a class="btn-o" href="/atlas" style="text-decoration:none">Try Atlas Free</a>
       </div>
       <p style="color:rgba(26,26,26,0.35);font-size:12px;letter-spacing:2px;margin-top:20px">No credit card · Limited beta spots</p>
     </div>
@@ -226,7 +227,7 @@ nav.dark .nbtn { background:rgba(201,168,76,0.9); color:#1a1a1a; }
       <h2 class="s-h" style="font-size:clamp(52px,7vw,92px);text-align:center">Your day is already<br><strong>taken care of.</strong></h2>
       <p class="s-p" style="text-align:center">Join the waitlist. Be first when Atlas launches.</p>
       <div style="display:flex;gap:14px;justify-content:center;margin-top:8px">
-        <button class="btn-d gold-btn">
+        <button class="btn-d gold-btn" onclick="atlasWaitlist()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           Join Free Waitlist
         </button>
@@ -285,7 +286,7 @@ nav.dark .nbtn { background:rgba(201,168,76,0.9); color:#1a1a1a; }
       <h2 class="cta-h reveal">Your day is already<br><strong>taken care of.</strong></h2>
       <p class="cta-sub reveal">Join the waitlist. Be first when Atlas launches.</p>
       <div class="cta-btns reveal">
-        <button class="btn-d gold-btn">
+        <button class="btn-d gold-btn" onclick="atlasWaitlist()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           Join Free Waitlist
         </button>
@@ -790,6 +791,83 @@ draw();
 // ── REVEAL ────────────────────────────────────────────────────────────────────
 const obs=new IntersectionObserver(e=>{e.forEach(e=>{if(e.isIntersecting)e.target.classList.add('v');});},{threshold:0.1});
 document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+</script>
+
+<!-- ── WAITLIST (added: posts to /api/waitlist) ─────────────────────────────── -->
+<script>
+(function(){
+  var GOLD='#c9a84c', DARK='#1a1a1a', CREAM='#f0ece6';
+  var overlay=null;
+
+  function close(){ if(overlay){ overlay.remove(); overlay=null; } }
+
+  window.atlasWaitlist=function(){
+    if(overlay) return;
+    overlay=document.createElement('div');
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(10,8,6,0.82);backdrop-filter:blur(6px);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px;font-family:inherit';
+    overlay.innerHTML=
+      '<div id="wl-card" style="background:'+CREAM+';border-radius:24px;padding:36px;max-width:440px;width:100%;box-shadow:0 30px 80px rgba(0,0,0,0.5)">'+
+        '<h3 style="margin:0 0 8px;font-size:24px;font-weight:700;color:'+DARK+';letter-spacing:-0.5px">Join the waitlist</h3>'+
+        '<p style="margin:0 0 22px;font-size:14px;line-height:1.6;color:rgba(26,26,26,0.55)">We&rsquo;ll email you when spots open.</p>'+
+        '<input id="wl-email" type="email" placeholder="your@email.com" autocomplete="email" '+
+          'style="width:100%;padding:15px 18px;border-radius:100px;border:1px solid rgba(26,26,26,0.18);background:#fff;font-size:15px;outline:none;font-family:inherit;color:'+DARK+'"/>'+
+        '<p id="wl-msg" style="min-height:20px;margin:12px 0 0;font-size:13px;color:'+GOLD+'"></p>'+
+        '<div style="display:flex;gap:10px;margin-top:14px">'+
+          '<button id="wl-cancel" style="flex:1;padding:15px;border-radius:100px;border:1px solid rgba(26,26,26,0.18);background:transparent;color:rgba(26,26,26,0.6);font-size:13px;cursor:pointer;font-family:inherit">Cancel</button>'+
+          '<button id="wl-go" style="flex:2;padding:15px;border-radius:100px;border:none;background:'+DARK+';color:'+CREAM+';font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-family:inherit">Join Waitlist</button>'+
+        '</div>'+
+      '</div>';
+    document.body.appendChild(overlay);
+
+    var input=overlay.querySelector('#wl-email');
+    var msg=overlay.querySelector('#wl-msg');
+    var go=overlay.querySelector('#wl-go');
+
+    input.focus();
+    overlay.addEventListener('click',function(e){ if(e.target===overlay) close(); });
+    overlay.querySelector('#wl-cancel').addEventListener('click',close);
+    input.addEventListener('keydown',function(e){ if(e.key==='Enter') submit(); });
+    go.addEventListener('click',submit);
+
+    function submit(){
+      var email=(input.value||'').trim();
+      if(!email||email.indexOf('@')===-1){
+        msg.textContent='Please enter a valid email address.';
+        msg.style.color='#c0392b';
+        return;
+      }
+      msg.textContent='Adding you…';
+      msg.style.color=GOLD;
+      go.disabled=true;
+
+      fetch('/api/waitlist',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email:email,source:'wow-landing'})
+      })
+      .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,data:d}; }); })
+      .then(function(res){
+        go.disabled=false;
+        if(!res.ok){
+          msg.textContent=res.data.error||'Something went wrong.';
+          msg.style.color='#c0392b';
+          return;
+        }
+        msg.textContent=res.data.message||"You're on the list.";
+        msg.style.color='#2e7d32';
+        input.value='';
+        setTimeout(close,2200);
+      })
+      .catch(function(){
+        go.disabled=false;
+        msg.textContent='Could not reach the server. Please try again.';
+        msg.style.color='#c0392b';
+      });
+    }
+  };
+
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape') close(); });
+})();
 </script>
 </body>
 </html>
