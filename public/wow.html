@@ -9,13 +9,14 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    ATLAS — landing page
 
-   Product-led, not image-led. Every panel below is live DOM built from the
-   same tokens as the real app, not a screenshot: crisp on any display, a few
-   KB instead of megabytes, and each element can be choreographed on its own.
+   Product-led, not image-led. Every panel is live DOM built from the app's own
+   tokens, not a screenshot: crisp at any resolution, a few KB rather than
+   megabytes, and every element can be choreographed on its own.
 
-   Light-dominant on purpose. The dark, glowing hero this replaced read as
-   generic AI imagery, which undercut the one thing Atlas actually has to
-   sell — that it tells you the truth about what it can and cannot do.
+   Motion is code-driven throughout — drifting light, a chat that actually runs,
+   counters, staggered reveals, parallax, cursor response. All of it composited
+   on transform/opacity so it stays cheap, and all of it disabled wholesale
+   under prefers-reduced-motion.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root{
@@ -23,42 +24,65 @@
   --paper-2:#efeae1;
   --ink:#14120f;
   --ink-70:rgba(20,18,15,0.72);
-  /* 0.66 / 0.60 rather than 0.45 / 0.25: at 11px those were measuring
-     1.7:1 against paper — unreadable, and well under the 4.5:1 AA floor.
-     0.60 clears 4.5 on all three surfaces the page uses (white 4.89,
-     paper 4.74, paper-2 4.60). Hierarchy now comes from size, weight and
+  /* 0.66 / 0.60 rather than 0.45 / 0.25: at 11px those measured 1.7:1 against
+     paper — unreadable, and far under the 4.5:1 AA floor. These clear 4.5 on
+     all three surfaces the page uses. Hierarchy comes from size and
      letter-spacing instead of washing the ink out. */
   --ink-45:rgba(20,18,15,0.66);
   --ink-25:rgba(20,18,15,0.60);
   --ink-12:rgba(20,18,15,0.12);
   --ink-06:rgba(20,18,15,0.06);
-  --gold:#7d6022;          /* 5.36:1 on paper, 4.91:1 on paper-2 — #c9a84c is only 2.1:1 */
+  --gold:#7d6022;          /* 5.36:1 on paper — #c9a84c is only 2.1:1 */
   --gold-bright:#c9a84c;   /* the original, used only on dark panels */
   --green:#2f7d4f;
   --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
   --sans:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;
+  --ease:cubic-bezier(.16,1,.3,1);
 }
 
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{
-  background:var(--paper);
-  color:var(--ink);
-  font-family:var(--sans);
-  -webkit-font-smoothing:antialiased;
-  overflow-x:hidden;
-  line-height:1.6;
+  background:var(--paper);color:var(--ink);font-family:var(--sans);
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;line-height:1.6;
+}
+
+/* ── living background ────────────────────────────────────────────────────
+   Three large, heavily blurred colour fields drifting on long loops, plus a
+   static grain plate. Pure transform animation, so it is GPU-composited and
+   costs essentially nothing — a canvas particle field would cost far more for
+   a less convincing result on a light ground. */
+#bg{position:fixed;inset:0;z-index:-2;overflow:hidden;pointer-events:none}
+.blob{position:absolute;border-radius:50%;filter:blur(90px);opacity:.55;will-change:transform}
+.blob.b1{width:52vw;height:52vw;left:-8vw;top:-12vw;
+  background:radial-gradient(circle,rgba(201,168,76,.30),transparent 68%);
+  animation:drift1 34s ease-in-out infinite}
+.blob.b2{width:46vw;height:46vw;right:-10vw;top:14vh;
+  background:radial-gradient(circle,rgba(120,150,190,.22),transparent 68%);
+  animation:drift2 44s ease-in-out infinite}
+.blob.b3{width:40vw;height:40vw;left:26vw;bottom:-14vw;
+  background:radial-gradient(circle,rgba(190,140,90,.20),transparent 68%);
+  animation:drift3 38s ease-in-out infinite}
+@keyframes drift1{0%,100%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(7vw,5vh,0) scale(1.12)}}
+@keyframes drift2{0%,100%{transform:translate3d(0,0,0) scale(1.06)}50%{transform:translate3d(-6vw,8vh,0) scale(1)}}
+@keyframes drift3{0%,100%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(5vw,-6vh,0) scale(1.1)}}
+/* A 90px blur across three large layers is the one genuinely expensive thing
+   here. Phones get a cheaper radius and no grain plate. */
+@media(max-width:760px){
+  .blob{filter:blur(58px);opacity:.45}
+  #grain{opacity:.18}
+}
+#grain{
+  position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.30;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
 }
 
 /* ── layout ───────────────────────────────────────────────────────────────── */
-.wrap{max-width:1180px;margin:0 auto;padding:0 32px}
+.wrap{max-width:1180px;margin:0 auto;padding:0 32px;position:relative}
 section{padding:130px 0;position:relative}
 @media(max-width:760px){section{padding:80px 0}.wrap{padding:0 22px}}
 
-.eyebrow{
-  font-size:11px;letter-spacing:3.5px;text-transform:uppercase;
-  color:var(--gold);font-weight:600;margin-bottom:20px;
-}
+.eyebrow{font-size:11px;letter-spacing:3.5px;text-transform:uppercase;color:var(--gold);font-weight:600;margin-bottom:20px}
 h1,h2,h3{font-weight:400;letter-spacing:-0.03em;line-height:1.06}
 h1{font-size:clamp(44px,6.1vw,76px)}
 h2{font-size:clamp(34px,4.6vw,60px)}
@@ -69,30 +93,35 @@ em{font-family:var(--serif);font-style:italic;font-weight:400}
 /* ── nav ──────────────────────────────────────────────────────────────────── */
 nav{
   position:fixed;top:0;left:0;right:0;z-index:900;
-  display:flex;align-items:center;justify-content:space-between;
-  padding:18px 32px;
-  background:rgba(247,244,239,0.82);
-  backdrop-filter:blur(18px);
-  border-bottom:1px solid transparent;
-  transition:border-color .3s;
+  display:flex;align-items:center;justify-content:space-between;padding:18px 32px;
+  background:rgba(247,244,239,0);backdrop-filter:blur(0px);
+  border-bottom:1px solid transparent;transition:background .4s,backdrop-filter .4s,border-color .4s;
 }
-nav.stuck{border-bottom-color:var(--ink-06)}
+nav.stuck{background:rgba(247,244,239,.78);backdrop-filter:blur(18px);border-bottom-color:var(--ink-06)}
 .logo{font-size:16px;font-weight:700;letter-spacing:5px;text-decoration:none;color:var(--ink)}
 .nav-links{display:flex;gap:34px;list-style:none}
-.nav-links a{font-size:13px;color:var(--ink-45);text-decoration:none;transition:color .2s}
+.nav-links a{font-size:13px;color:var(--ink-45);text-decoration:none;position:relative}
+.nav-links a::after{content:'';position:absolute;left:0;right:100%;bottom:-4px;height:1px;
+  background:var(--ink);transition:right .4s var(--ease)}
 .nav-links a:hover{color:var(--ink)}
+.nav-links a:hover::after{right:0}
 @media(max-width:820px){.nav-links{display:none}}
 
+/* scroll progress hairline */
+#prog{position:fixed;top:0;left:0;height:2px;width:0;background:var(--gold);z-index:950;transition:width .1s linear}
+
 .btn{
-  display:inline-flex;align-items:center;gap:9px;
-  padding:13px 26px;border-radius:100px;border:1px solid transparent;
-  font-size:13.5px;font-weight:600;font-family:inherit;
-  text-decoration:none;cursor:pointer;transition:all .22s;white-space:nowrap;
+  display:inline-flex;align-items:center;gap:9px;padding:13px 26px;border-radius:100px;
+  border:1px solid transparent;font-size:13.5px;font-weight:600;font-family:inherit;
+  text-decoration:none;cursor:pointer;white-space:nowrap;position:relative;overflow:hidden;
+  transition:transform .3s var(--ease),box-shadow .3s var(--ease),border-color .3s,color .3s;
 }
 .btn-primary{background:var(--ink);color:var(--paper)}
-.btn-primary:hover{transform:translateY(-1px);box-shadow:0 10px 24px rgba(20,18,15,0.18)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 14px 30px -8px rgba(20,18,15,.4)}
+.btn-primary svg{transition:transform .3s var(--ease)}
+.btn-primary:hover svg{transform:translateX(4px)}
 .btn-ghost{border-color:var(--ink-12);color:var(--ink-70);background:transparent}
-.btn-ghost:hover{border-color:var(--ink);color:var(--ink)}
+.btn-ghost:hover{border-color:var(--ink);color:var(--ink);transform:translateY(-2px)}
 
 /* ── hero ─────────────────────────────────────────────────────────────────── */
 #hero{padding-top:180px;padding-bottom:70px}
@@ -103,65 +132,73 @@ nav.stuck{border-bottom-color:var(--ink-06)}
 .hero-actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 .hero-note{font-size:12.5px;color:var(--ink-25);margin-top:20px;letter-spacing:.3px}
 
-/* ── product surface: shared look for every live panel ────────────────────── */
+/* headline reveals line by line under a mask */
+.lineMask{display:block;overflow:hidden}
+.lineMask>span{display:block;transform:translateY(102%);transition:transform 1s var(--ease)}
+.in .lineMask>span,.lineMask.in>span{transform:none}
+
+/* ── panels ───────────────────────────────────────────────────────────────── */
 .panel{
-  background:#fff;
-  border:1px solid var(--ink-06);
-  border-radius:18px;
-  box-shadow:0 1px 2px rgba(20,18,15,.04), 0 18px 44px -20px rgba(20,18,15,.22);
-  overflow:hidden;
+  background:#fff;border:1px solid var(--ink-06);border-radius:18px;
+  box-shadow:0 1px 2px rgba(20,18,15,.04), 0 22px 50px -22px rgba(20,18,15,.28);
+  overflow:hidden;transition:transform .5s var(--ease),box-shadow .5s var(--ease);
+  transform-style:preserve-3d;
 }
-.panel-bar{
-  display:flex;align-items:center;gap:9px;
-  padding:13px 16px;border-bottom:1px solid var(--ink-06);
-  background:linear-gradient(#fff,#fcfaf7);
-}
+.panel-bar{display:flex;align-items:center;gap:9px;padding:13px 16px;
+  border-bottom:1px solid var(--ink-06);background:linear-gradient(#fff,#fcfaf7)}
 .dot{width:9px;height:9px;border-radius:50%;background:var(--ink-12);display:inline-block}
-.panel-title{
-  font-size:11px;letter-spacing:2px;text-transform:uppercase;
-  color:var(--ink-25);margin-left:6px;font-weight:600;
-}
-.atlas-mark{
-  width:26px;height:26px;border-radius:50%;flex-shrink:0;
-  background:linear-gradient(135deg,#c9a84c,#e8c96a);
-  display:flex;align-items:center;justify-content:center;
-  font-size:11px;font-weight:800;color:#14120f;
-}
+.panel-title{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--ink-25);margin-left:6px;font-weight:600}
+.atlas-mark{width:26px;height:26px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,#c9a84c,#e8c96a);display:flex;align-items:center;
+  justify-content:center;font-size:11px;font-weight:800;color:#14120f}
+.pulse{position:relative}
+.pulse::after{content:'';position:absolute;inset:0;border-radius:50%;
+  border:1px solid rgba(201,168,76,.7);animation:ring 2.4s ease-out infinite}
+@keyframes ring{0%{transform:scale(1);opacity:.8}100%{transform:scale(2.1);opacity:0}}
 
 /* ── chat ─────────────────────────────────────────────────────────────────── */
-.chat{padding:20px}
+.chat{padding:20px;min-height:290px}
 .msg{display:flex;gap:11px;margin-bottom:16px;align-items:flex-end}
-.msg.at{align-items:flex-start}   /* avatar tracks the top of a tall reply */
+.msg.at{align-items:flex-start}
 .msg.me{justify-content:flex-end}
 .bubble{max-width:80%;padding:12px 16px;border-radius:16px;font-size:14.5px;line-height:1.6}
 .msg.me .bubble{background:var(--ink);color:var(--paper);border-bottom-right-radius:5px}
 .msg.at .bubble{background:var(--paper-2);color:var(--ink);border-bottom-left-radius:5px}
+.msg.enter{animation:msgIn .55s var(--ease) both}
+@keyframes msgIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}
-.chip{
-  font-size:10.5px;padding:3px 10px;border-radius:999px;
-  border:1px solid var(--ink-12);color:var(--ink-45);
-  display:inline-flex;align-items:center;gap:5px;
-}
+.chip{font-size:10.5px;padding:3px 10px;border-radius:999px;border:1px solid var(--ink-12);
+  color:var(--ink-45);display:inline-flex;align-items:center;gap:5px;
+  animation:chipIn .45s var(--ease) both}
+@keyframes chipIn{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:none}}
 .chip .led{width:6px;height:6px;border-radius:50%;background:var(--ink-12)}
 .chip.live{border-color:rgba(47,125,79,.3);color:var(--green);background:rgba(47,125,79,.05)}
 .chip.live .led{background:var(--green)}
 .saved{margin-top:13px;padding-top:13px;border-top:1px dashed var(--ink-12);font-size:12px;color:var(--ink-45)}
 .saved b{color:var(--green);font-weight:600}
-.caret{
-  display:inline-block;width:2px;height:1em;background:var(--paper);
-  vertical-align:-2px;margin-left:1px;animation:blink 1s steps(2) infinite;
-}
+.caret{display:inline-block;width:2px;height:1em;background:var(--paper);
+  vertical-align:-2px;margin-left:1px;animation:blink 1s steps(2) infinite}
 @keyframes blink{50%{opacity:0}}
+.typing{display:inline-flex;gap:4px;padding:4px 2px}
+.typing i{width:6px;height:6px;border-radius:50%;background:var(--ink-25);animation:bob 1.1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes bob{0%,60%,100%{transform:translateY(0);opacity:.45}30%{transform:translateY(-5px);opacity:1}}
 
 /* ── agent grid ───────────────────────────────────────────────────────────── */
 .agents{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:9px;margin-top:44px}
-.agent{
-  display:flex;align-items:center;gap:10px;
-  padding:13px 15px;border-radius:11px;
+.agent{display:flex;align-items:center;gap:10px;padding:13px 15px;border-radius:11px;
   border:1px solid var(--ink-06);background:#fff;font-size:13.5px;
-}
+  transition:opacity .5s var(--ease),transform .5s var(--ease),box-shadow .3s}
+/* Hidden ONLY once JS has set html.anim, i.e. once something is guaranteed to
+   reveal it. Content that depends on script to become visible has already
+   shipped broken on this page once. */
+html.anim .agent{opacity:0;transform:translateY(14px)}
+html.anim .agent.lit{opacity:1;transform:none}
+.agent:hover{box-shadow:0 8px 20px -10px rgba(20,18,15,.3)}
 .agent .led{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .agent.on .led{background:var(--green);box-shadow:0 0 0 3px rgba(47,125,79,.14)}
+.agent.on.lit .led{animation:led .5s var(--ease)}
+@keyframes led{0%{box-shadow:0 0 0 0 rgba(47,125,79,.5)}100%{box-shadow:0 0 0 3px rgba(47,125,79,.14)}}
 .agent.off{background:transparent;border-style:dashed}
 .agent.off .led{background:var(--ink-12)}
 .agent.off .name{color:var(--ink-25)}
@@ -170,27 +207,29 @@ nav.stuck{border-bottom-color:var(--ink-06)}
 .legend span{display:inline-flex;align-items:center;gap:7px}
 .swatch{width:7px;height:7px;border-radius:50%;display:inline-block}
 
-/* ── dashboard mock ───────────────────────────────────────────────────────── */
+/* ── dashboard ────────────────────────────────────────────────────────────── */
 .dash{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--ink-06)}
 @media(max-width:620px){.dash{grid-template-columns:1fr}}
 .cell{background:#fff;padding:18px 20px}
 .cell-l{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:13px}
-.row{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--ink-06);font-size:13.5px}
+.row{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--ink-06);font-size:13.5px;
+  transition:opacity .5s var(--ease),transform .5s var(--ease)}
+html.anim .row{opacity:0;transform:translateX(-10px)}
+html.anim .row.lit{opacity:1;transform:none}
 .row:last-child{border-bottom:0}
 .row .tick{width:17px;height:17px;border-radius:50%;border:1.5px solid var(--ink-12);flex-shrink:0}
 .row .amt{margin-left:auto;font-weight:600;font-variant-numeric:tabular-nums}
 .sub{font-size:11.5px;color:var(--ink-25)}
-.new-flag{
-  font-size:9.5px;letter-spacing:1px;text-transform:uppercase;
-  color:var(--green);background:rgba(47,125,79,.09);
-  padding:2px 7px;border-radius:999px;margin-left:auto;font-weight:700;
-}
+.new-flag{font-size:9.5px;letter-spacing:1px;text-transform:uppercase;color:var(--green);
+  background:rgba(47,125,79,.09);padding:2px 7px;border-radius:999px;margin-left:auto;font-weight:700}
+.row.lit .new-flag{animation:pop .5s var(--ease) .25s both}
+@keyframes pop{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:none}}
 
-/* ── jobs mock ────────────────────────────────────────────────────────────── */
+/* ── jobs ─────────────────────────────────────────────────────────────────── */
 .jobs-grid{display:grid;grid-template-columns:auto 1fr;gap:26px;align-items:center;padding:22px}
 @media(max-width:620px){.jobs-grid{grid-template-columns:1fr;gap:16px}}
 .score{text-align:center;min-width:112px}
-.score-n{font-size:52px;font-weight:300;letter-spacing:-3px;line-height:1;color:var(--green)}
+.score-n{font-size:52px;font-weight:300;letter-spacing:-3px;line-height:1;color:var(--green);font-variant-numeric:tabular-nums}
 .score-l{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--ink-25);margin-top:5px}
 .gaps{display:grid;grid-template-columns:1fr 1fr;gap:18px;font-size:13px}
 @media(max-width:520px){.gaps{grid-template-columns:1fr}}
@@ -200,53 +239,46 @@ nav.stuck{border-bottom-color:var(--ink-06)}
 .docs{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--ink-06);border-top:1px solid var(--ink-06)}
 @media(max-width:620px){.docs{grid-template-columns:1fr}}
 .doc{background:#fff;padding:16px 20px}
-.doc pre{
-  font-family:var(--sans);font-size:11.5px;line-height:1.75;color:var(--ink-45);
+.doc pre{font-family:var(--sans);font-size:11.5px;line-height:1.75;color:var(--ink-45);
   white-space:pre-wrap;max-height:132px;overflow:hidden;
-  -webkit-mask-image:linear-gradient(#000 68%,transparent);
-  mask-image:linear-gradient(#000 68%,transparent);
-}
+  -webkit-mask-image:linear-gradient(#000 68%,transparent);mask-image:linear-gradient(#000 68%,transparent)}
 
 /* ── split rows ───────────────────────────────────────────────────────────── */
 .split{display:grid;grid-template-columns:1fr 1.15fr;gap:64px;align-items:center}
 .split.flip{grid-template-columns:1.15fr 1fr}
-@media(max-width:980px){
-  .split,.split.flip{grid-template-columns:1fr;gap:36px}
-  .split.flip .copy{order:-1}
-}
+@media(max-width:980px){.split,.split.flip{grid-template-columns:1fr;gap:36px}.split.flip .copy{order:-1}}
 
 /* ── stats ────────────────────────────────────────────────────────────────── */
 #stats{border-top:1px solid var(--ink-06);border-bottom:1px solid var(--ink-06);padding:60px 0}
 .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:26px;text-align:center}
 @media(max-width:760px){.stats-grid{grid-template-columns:repeat(2,1fr);gap:34px}}
-.stat-n{font-size:clamp(30px,3.6vw,44px);font-weight:300;letter-spacing:-2px}
+.stat-n{font-size:clamp(30px,3.6vw,44px);font-weight:300;letter-spacing:-2px;font-variant-numeric:tabular-nums}
 .stat-l{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--ink-25);margin-top:7px}
 
 /* ── pricing ──────────────────────────────────────────────────────────────── */
 .price-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:840px;margin:52px auto 0}
 @media(max-width:760px){.price-grid{grid-template-columns:1fr}}
-.price-card{border:1px solid var(--ink-12);border-radius:20px;padding:38px 34px;background:#fff}
+.price-card{border:1px solid var(--ink-12);border-radius:20px;padding:38px 34px;background:#fff;
+  transition:transform .45s var(--ease),box-shadow .45s var(--ease)}
+.price-card:hover{transform:translateY(-6px);box-shadow:0 24px 50px -22px rgba(20,18,15,.32)}
 .price-card.pop{background:var(--ink);color:var(--paper);border-color:var(--ink);position:relative}
-.pop-badge{
-  position:absolute;top:-11px;left:50%;transform:translateX(-50%);
-  background:var(--gold-bright);color:#14120f;font-size:9.5px;font-weight:800;
-  letter-spacing:1.5px;padding:5px 14px;border-radius:999px;
-}
+.pop-badge{position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:var(--gold-bright);
+  color:#14120f;font-size:9.5px;font-weight:800;letter-spacing:1.5px;padding:5px 14px;border-radius:999px}
 .price-name{font-size:12px;letter-spacing:2.5px;text-transform:uppercase;color:var(--ink-45)}
-.price-card.pop .price-name{color:rgba(247,244,239,.55)}
+.price-card.pop .price-name{color:rgba(247,244,239,.6)}
 .price-amt{font-size:52px;font-weight:300;letter-spacing:-2.5px;margin:14px 0 2px}
 .price-per{font-size:12.5px;color:var(--ink-25);margin-bottom:26px}
-.price-card.pop .price-per{color:rgba(247,244,239,.45)}
+.price-card.pop .price-per{color:rgba(247,244,239,.55)}
 .price-feats{list-style:none;margin-bottom:30px}
 .price-feats li{padding:8px 0;font-size:14px;display:flex;gap:11px;color:var(--ink-70)}
-.price-card.pop .price-feats li{color:rgba(247,244,239,.82)}
+.price-card.pop .price-feats li{color:rgba(247,244,239,.85)}
 .price-feats i{color:var(--gold);font-weight:700;font-style:normal}
 .price-card.pop .price-feats i{color:var(--gold-bright)}
 .price-btn{width:100%;justify-content:center}
 
 /* ── cta / footer ─────────────────────────────────────────────────────────── */
-#cta{background:var(--ink);color:var(--paper);text-align:center}
-#cta .lead{color:rgba(247,244,239,.6);margin:0 auto}
+#cta{background:var(--ink);color:var(--paper);text-align:center;overflow:hidden}
+#cta .lead{color:rgba(247,244,239,.65);margin:0 auto}
 #cta .eyebrow{color:var(--gold-bright)}
 footer{padding:52px 0;border-top:1px solid var(--ink-06);font-size:12.5px;color:var(--ink-25)}
 .foot-row{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
@@ -254,23 +286,33 @@ footer{padding:52px 0;border-top:1px solid var(--ink-06);font-size:12.5px;color:
 /* ── reveal: visible by default, hidden only where motion is welcome ──────── */
 .rv{opacity:1;transform:none}
 @media (prefers-reduced-motion: no-preference){
-  .rv{opacity:0;transform:translateY(22px);
-      transition:opacity .8s cubic-bezier(.16,1,.3,1),transform .8s cubic-bezier(.16,1,.3,1)}
+  .rv{opacity:0;transform:translateY(24px);transition:opacity .85s var(--ease),transform .85s var(--ease)}
   .rv.in{opacity:1;transform:none}
+}
+@media (prefers-reduced-motion: reduce){
+  .blob{animation:none}
+  .lineMask>span{transform:none}
+  html.anim .agent,html.anim .row{opacity:1;transform:none}
 }
 
 /* ── waitlist ─────────────────────────────────────────────────────────────── */
 #wl{position:fixed;inset:0;background:rgba(20,18,15,.55);backdrop-filter:blur(6px);
-    display:none;align-items:center;justify-content:center;z-index:1000;padding:22px}
-#wl.on{display:flex}
+  display:none;align-items:center;justify-content:center;z-index:1000;padding:22px}
+#wl.on{display:flex;animation:fade .3s ease both}
+@keyframes fade{from{opacity:0}to{opacity:1}}
 .wl-card{background:#fff;border-radius:22px;padding:34px;max-width:430px;width:100%;
-         box-shadow:0 30px 80px rgba(20,18,15,.3)}
+  box-shadow:0 30px 80px rgba(20,18,15,.3);animation:cardIn .45s var(--ease) both}
+@keyframes cardIn{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:none}}
 .wl-in{width:100%;padding:14px 18px;border-radius:100px;border:1px solid var(--ink-12);
-       font-size:15px;font-family:inherit;outline:none;color:var(--ink)}
+  font-size:15px;font-family:inherit;outline:none;color:var(--ink)}
 .wl-in:focus{border-color:var(--ink)}
 </style>
 </head>
 <body>
+
+<div id="bg"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+<div id="grain"></div>
+<div id="prog"></div>
 
 <nav id="nav">
   <a href="#hero" class="logo">ATLAS</a>
@@ -288,7 +330,10 @@ footer{padding:52px 0;border-top:1px solid var(--ink-06);font-size:12.5px;color:
   <div class="wrap hero-grid">
     <div>
       <div class="eyebrow rv">Private beta · Limited access</div>
-      <h1 class="rv">Your personal AI.<br><em>Always working.</em></h1>
+      <h1 class="rv" id="h1">
+        <span class="lineMask"><span>Your personal AI.</span></span>
+        <span class="lineMask"><span><em>Always working.</em></span></span>
+      </h1>
       <p class="lead hero-sub rv">
         Atlas handles your email, tasks, invoices, expenses and job applications —
         and tells you plainly when it can't do something, instead of pretending it did.
@@ -303,32 +348,16 @@ footer{padding:52px 0;border-top:1px solid var(--ink-06);font-size:12.5px;color:
       <p class="hero-note rv">No credit card · 5 free messages a day</p>
     </div>
 
-    <!-- live chat panel: real markup, not a screenshot -->
-    <div class="panel rv" id="chatPanel">
+    <!-- the chat runs a real loop of exchanges rather than sitting still -->
+    <div class="panel rv tilt" id="chatPanel">
       <div class="panel-bar">
-        <div class="atlas-mark">A</div>
+        <div class="atlas-mark pulse">A</div>
         <span class="panel-title">Atlas</span>
         <span style="margin-left:auto;font-size:11px;color:var(--green);display:flex;align-items:center;gap:6px">
           <span class="swatch" style="background:var(--green)"></span><span id="navCount">10 agents connected</span>
         </span>
       </div>
-      <div class="chat">
-        <div class="msg me"><div class="bubble" id="typed">I spent £85 at Waitrose and need to invoice Sarah at Creative Agency £2,500 for the logo project<span class="caret" id="caret"></span></div></div>
-        <div class="msg at" id="reply">
-          <div class="atlas-mark" style="width:22px;height:22px;font-size:9px">A</div>
-          <div class="bubble">
-            ✓ Logged the £85 Waitrose expense.<br>
-            ✓ Saved Sarah — Creative Agency, client.<br>
-            – Invoice for £2,500 is ready to raise whenever you say.
-            <div class="chips">
-              <span class="chip live"><span class="led"></span>Finance</span>
-              <span class="chip live"><span class="led"></span>Contacts</span>
-              <span class="chip live"><span class="led"></span>Invoice</span>
-            </div>
-            <div class="saved">Written to your account: <b>1 expense · 1 contact · 1 task</b></div>
-          </div>
-        </div>
-      </div>
+      <div class="chat" id="chat"></div>
     </div>
   </div>
 </section>
@@ -344,7 +373,7 @@ footer{padding:52px 0;border-top:1px solid var(--ink-06);font-size:12.5px;color:
         its wiring. This panel is pulled live from the running product — not a graphic.
       </p>
     </div>
-    <div class="agents rv" id="agentGrid"></div>
+    <div class="agents" id="agentGrid"></div>
     <div class="legend rv">
       <span><i class="swatch" style="background:var(--green)"></i> Connected and doing real work</span>
       <span><i class="swatch" style="background:var(--ink-12)"></i> Not built yet — Atlas will say so</span>
@@ -363,9 +392,9 @@ footer{padding:52px 0;border-top:1px solid var(--ink-06);font-size:12.5px;color:
         passing and it lands in the right place before Atlas has finished replying.
       </p>
     </div>
-    <div class="panel rv">
+    <div class="panel rv tilt par" data-par="18">
       <div class="panel-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="panel-title">Dashboard</span></div>
-      <div class="dash">
+      <div class="dash" id="dash">
         <div class="cell">
           <div class="cell-l">Expenses</div>
           <div class="row"><span>Waitrose</span><span class="new-flag">new</span><span class="amt" style="margin-left:12px">£85</span></div>
@@ -395,11 +424,11 @@ footer{padding:52px 0;border-top:1px solid var(--ink-06);font-size:12.5px;color:
 <!-- ═══ JOBS ═══════════════════════════════════════════════════════════════ -->
 <section id="jobs" style="background:var(--paper-2)">
   <div class="wrap split flip">
-    <div class="panel rv">
+    <div class="panel rv tilt par" data-par="-18">
       <div class="panel-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="panel-title">Application package</span></div>
       <div class="jobs-grid">
         <div class="score">
-          <div class="score-n">82<span style="font-size:24px">%</span></div>
+          <div class="score-n"><span class="count" data-to="82">0</span><span style="font-size:24px">%</span></div>
           <div class="score-l">Apply</div>
         </div>
         <div class="gaps">
@@ -455,9 +484,9 @@ honest when it isn't sure.</pre>
 <!-- ═══ STATS ══════════════════════════════════════════════════════════════ -->
 <section id="stats">
   <div class="wrap stats-grid">
-    <div class="rv"><div class="stat-n" id="statAgents">10</div><div class="stat-l">Agents working</div></div>
-    <div class="rv"><div class="stat-n">2–4h</div><div class="stat-l">Saved daily</div></div>
-    <div class="rv"><div class="stat-n">£299</div><div class="stat-l">From, per month</div></div>
+    <div class="rv"><div class="stat-n"><span class="count" data-to="10" id="statAgents">0</span></div><div class="stat-l">Agents working</div></div>
+    <div class="rv"><div class="stat-n"><span class="count" data-to="4">0</span>h</div><div class="stat-l">Saved daily</div></div>
+    <div class="rv"><div class="stat-n">£<span class="count" data-to="299">0</span></div><div class="stat-l">From, per month</div></div>
     <div class="rv"><div class="stat-n">24/7</div><div class="stat-l">Always on</div></div>
   </div>
 </section>
@@ -507,7 +536,7 @@ honest when it isn't sure.</pre>
     <p class="lead rv" style="text-align:center">Join the waitlist and be first when the next agents land.</p>
     <div class="rv" style="margin-top:34px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
       <button class="btn" style="background:var(--gold-bright);color:#14120f" onclick="openWL()">Join the waitlist</button>
-      <a href="/atlas" class="btn btn-ghost" style="border-color:rgba(247,244,239,.25);color:rgba(247,244,239,.8)">Try it now</a>
+      <a href="/atlas" class="btn btn-ghost" style="border-color:rgba(247,244,239,.28);color:rgba(247,244,239,.85)">Try it now</a>
     </div>
   </div>
 </section>
@@ -533,125 +562,257 @@ honest when it isn't sure.</pre>
 </div>
 
 <script>
-/* ── reveal on scroll ─────────────────────────────────────────────────────── */
+var REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* Opt into the hidden-then-reveal state only now that script is running. */
+if(!REDUCE) document.documentElement.classList.add('anim');
+
+/* ── reveals ──────────────────────────────────────────────────────────────── */
 var io=new IntersectionObserver(function(es){
-  es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+  es.forEach(function(e){
+    if(!e.isIntersecting) return;
+    e.target.classList.add('in');
+    e.target.querySelectorAll('.lineMask').forEach(function(m,i){
+      setTimeout(function(){ m.classList.add('in'); }, i*110);
+    });
+    io.unobserve(e.target);
+  });
 },{threshold:.12,rootMargin:'0px 0px -8% 0px'});
+
 document.querySelectorAll('.rv').forEach(function(el,i){
   el.style.transitionDelay=(Math.min(i,6)*55)+'ms';
   io.observe(el);
 });
 
-/* Anything already in the first viewport is revealed straight away rather than
-   waiting on the observer. Above the fold, an observer round-trip means the
-   hero is blank for the best part of a second on load — which is exactly the
-   "page looks broken" failure this rebuild set out to remove. */
+/* Above the fold reveals immediately — waiting on the observer leaves the hero
+   blank for most of a second, which is the "looks broken" failure this page has
+   already shipped once. */
 requestAnimationFrame(function(){
   document.querySelectorAll('.rv').forEach(function(el){
-    if(el.getBoundingClientRect().top < innerHeight){ el.classList.add('in'); io.unobserve(el); }
+    if(el.getBoundingClientRect().top < innerHeight){
+      el.classList.add('in');
+      el.querySelectorAll('.lineMask').forEach(function(m,i){ setTimeout(function(){ m.classList.add('in'); },120+i*110); });
+      io.unobserve(el);
+    }
   });
 });
-
-/* Last-resort safety net: nothing stays invisible, whatever happens above. */
-setTimeout(function(){
+setTimeout(function(){   /* last-resort: nothing stays invisible */
   document.querySelectorAll('.rv:not(.in)').forEach(function(el){
     if(el.getBoundingClientRect().top < innerHeight*1.5) el.classList.add('in');
   });
-},2500);
+  document.querySelectorAll('.lineMask:not(.in)').forEach(function(m){
+    if(m.getBoundingClientRect().top < innerHeight) m.classList.add('in');
+  });
+},2600);
 
-addEventListener('scroll',function(){
-  document.getElementById('nav').classList.toggle('stuck', scrollY>12);
-},{passive:true});
+/* Absolute backstop: after 5s nothing on the page is allowed to still be
+   hidden by a reveal class. */
+setTimeout(function(){
+  document.querySelectorAll('.agent:not(.lit),.row:not(.lit)').forEach(function(el){ el.classList.add('lit'); });
+  document.querySelectorAll('.rv:not(.in)').forEach(function(el){ el.classList.add('in'); });
+  document.querySelectorAll('.lineMask:not(.in)').forEach(function(el){ el.classList.add('in'); });
+},5000);
 
-/* ── hero: type the message, then reveal the reply ────────────────────────
-   The full text ships in the DOM. This only re-reveals it, so with reduced
-   motion — or if this script never runs — the message is simply there. */
-(function typeHero(){
-  var el=document.getElementById('typed'),
-      caret=document.getElementById('caret'),
-      reply=document.getElementById('reply'),
-      panel=document.getElementById('chatPanel');
-  if(!el||!reply||!panel) return;
+/* ── nav state + scroll progress ──────────────────────────────────────────── */
+var nav=document.getElementById('nav'), prog=document.getElementById('prog');
+function onScroll(){
+  nav.classList.toggle('stuck', scrollY>12);
+  var max=document.documentElement.scrollHeight-innerHeight;
+  prog.style.width=(max>0 ? (scrollY/max*100) : 0)+'%';
+}
+addEventListener('scroll',onScroll,{passive:true}); onScroll();
 
-  if(matchMedia('(prefers-reduced-motion: reduce)').matches){ if(caret) caret.remove(); return; }
+/* ── parallax on the product panels ───────────────────────────────────────── */
+if(!REDUCE){
+  var pars=[].slice.call(document.querySelectorAll('.par'));
+  var ticking=false;
+  addEventListener('scroll',function(){
+    if(ticking) return; ticking=true;
+    requestAnimationFrame(function(){
+      var vh=innerHeight;
+      pars.forEach(function(el){
+        var r=el.getBoundingClientRect();
+        if(r.bottom<0||r.top>vh) return;
+        var mid=(r.top+r.height/2-vh/2)/vh;      /* -1 .. 1 across the viewport */
+        el.style.setProperty('--py',(mid*parseFloat(el.dataset.par||12)).toFixed(1)+'px');
+        el.style.transform='translate3d(0,var(--py,0),0)';
+      });
+      ticking=false;
+    });
+  },{passive:true});
+}
 
-  var full=el.childNodes[0].nodeValue;
-  reply.style.opacity=0;
+/* ── count-up numbers ─────────────────────────────────────────────────────── */
+var countIO=new IntersectionObserver(function(es){
+  es.forEach(function(e){
+    if(!e.isIntersecting) return;
+    var el=e.target, to=parseFloat(el.dataset.to)||0;
+    countIO.unobserve(el);
+    if(REDUCE){ el.textContent=to; return; }
+    var t0=performance.now(), dur=1100;
+    (function step(now){
+      var p=Math.min(1,(now-t0)/dur);
+      el.textContent=Math.round(to*(1-Math.pow(1-p,3)));   /* ease-out cubic */
+      if(p<1) requestAnimationFrame(step);
+    })(performance.now());
+  });
+},{threshold:.6});
+document.querySelectorAll('.count').forEach(function(el){ countIO.observe(el); });
 
-  var started=false;
-  function start(){
-    if(started) return; started=true;
-    el.childNodes[0].nodeValue='';
-    var i=0;
-    (function tick(){
-      el.childNodes[0].nodeValue=full.slice(0,++i);
-      if(i<full.length) setTimeout(tick, 16+Math.random()*26);
-      else{
-        if(caret) caret.remove();
-        setTimeout(function(){
-          reply.style.transition='opacity .6s ease, transform .6s cubic-bezier(.16,1,.3,1)';
-          reply.style.transform='translateY(10px)';
-          requestAnimationFrame(function(){ reply.style.opacity=1; reply.style.transform='none'; });
-        },420);
-      }
+/* ── staggered lighting for agents + dashboard rows ───────────────────────── */
+function stagger(container,sel,step){
+  var fired=false;
+  function go(){
+    if(fired) return; fired=true;
+    container.querySelectorAll(sel).forEach(function(it,i){
+      setTimeout(function(){ it.classList.add('lit'); }, REDUCE?0:i*step);
+    });
+  }
+  /* Already on screen when called — light it now rather than waiting for an
+     intersection change that may never come. */
+  var r=container.getBoundingClientRect();
+  if(r.top < innerHeight && r.bottom > 0){ go(); return; }
+
+  var ob=new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting){ ob.disconnect(); go(); } });
+  },{threshold:.15});
+  ob.observe(container);
+
+  setTimeout(go,4000);   /* whatever happens, it does not stay invisible */
+}
+var dash=document.getElementById('dash');
+if(dash) stagger(dash,'.row',70);
+
+/* ── panel tilt on pointer ────────────────────────────────────────────────── */
+if(!REDUCE && matchMedia('(hover:hover)').matches){
+  document.querySelectorAll('.tilt').forEach(function(el){
+    el.addEventListener('mousemove',function(ev){
+      var r=el.getBoundingClientRect();
+      var x=(ev.clientX-r.left)/r.width-.5, y=(ev.clientY-r.top)/r.height-.5;
+      el.style.transform='perspective(900px) rotateY('+(x*4).toFixed(2)+'deg) rotateX('+(-y*4).toFixed(2)+'deg) translate3d(0,var(--py,0),0)';
+    });
+    el.addEventListener('mouseleave',function(){
+      el.style.transform='translate3d(0,var(--py,0),0)';
+    });
+  });
+}
+
+/* ── the hero chat actually runs ──────────────────────────────────────────
+   Three exchanges on a loop, each typed then answered. Shows the honest reply
+   format: a tick only for what was genuinely written, an en dash for what is
+   merely drafted. */
+var SCRIPT=[
+  { ask:"I spent £85 at Waitrose and need to invoice Sarah at Creative Agency £2,500 for the logo project",
+    say:"✓ Logged the £85 Waitrose expense.<br>✓ Saved Sarah — Creative Agency, client.<br>– Invoice for £2,500 is ready to raise whenever you say.",
+    chips:["Finance","Contacts","Invoice"],
+    saved:"1 expense · 1 contact · 1 task" },
+  { ask:"Book me a flight to Lisbon on the 14th",
+    say:"I can't book flights — Travel isn't connected yet, and I won't pretend it is.<br>I've added a task to book it, and I can draft the itinerary now if that helps.",
+    chips:["Travel","Tasks"], off:[0],
+    saved:"1 task" },
+  { ask:"What's worth my attention this morning?",
+    say:"Two things.<br>– Creative Agency is 4 days overdue at £2,500.<br>– Thursday's interview prep is still open, and it's Tuesday.",
+    chips:["Briefing","Invoice","Tasks"],
+    saved:"nothing — this one was just a question" }
+];
+
+(function chatLoop(){
+  var box=document.getElementById('chat');
+  if(!box) return;
+
+  function el(html){ var d=document.createElement('div'); d.innerHTML=html; return d.firstElementChild; }
+  function mark(sm){ return '<div class="atlas-mark'+(sm?'" style="width:22px;height:22px;font-size:9px"':'"')+'>A</div>'; }
+
+  function render(step){
+    var chips=step.chips.map(function(c,i){
+      var off=(step.off||[]).indexOf(i)>=0;
+      return '<span class="chip'+(off?'':' live')+'" style="animation-delay:'+(i*90)+'ms"><span class="led"></span>'+c+'</span>';
+    }).join('');
+    return '<div class="msg at enter">'+mark(true)+
+           '<div class="bubble">'+step.say+
+           '<div class="chips">'+chips+'</div>'+
+           '<div class="saved">Written to your account: <b>'+step.saved+'</b></div>'+
+           '</div></div>';
+  }
+
+  var i=0, alive=true;
+  function run(){
+    if(!alive) return;
+    var step=SCRIPT[i%SCRIPT.length]; i++;
+    box.innerHTML='';
+
+    var ask=el('<div class="msg me enter"><div class="bubble"><span class="t"></span><span class="caret"></span></div></div>');
+    box.appendChild(ask);
+    var span=ask.querySelector('.t'), caret=ask.querySelector('.caret');
+
+    if(REDUCE){
+      span.textContent=step.ask; caret.remove();
+      box.insertAdjacentHTML('beforeend',render(step));
+      return;                                  /* no loop under reduced motion */
+    }
+
+    var n=0;
+    (function type(){
+      if(!alive) return;
+      span.textContent=step.ask.slice(0,++n);
+      if(n<step.ask.length) return setTimeout(type,15+Math.random()*22);
+      caret.remove();
+
+      var dots=el('<div class="msg at enter">'+mark(true)+'<div class="bubble"><span class="typing"><i></i><i></i><i></i></span></div></div>');
+      box.appendChild(dots);
+      setTimeout(function(){
+        if(!alive) return;
+        dots.remove();
+        box.insertAdjacentHTML('beforeend',render(step));
+        setTimeout(run,4200);                  /* hold, then next exchange */
+      },1150);
     })();
   }
 
-  // Safety net: if the observer never fires, show everything anyway.
-  var bail=setTimeout(function(){ started=true; el.childNodes[0].nodeValue=full; if(caret)caret.remove(); reply.style.opacity=1; },6000);
+  /* only run while the panel is on screen — no work in a background tab */
+  new IntersectionObserver(function(es){
+    es.forEach(function(e){
+      if(e.isIntersecting && !alive){ alive=true; run(); }
+      else if(!e.isIntersecting){ alive=false; }
+    });
+  },{threshold:.25}).observe(document.getElementById('chatPanel'));
 
-  new IntersectionObserver(function(es,o){
-    es.forEach(function(e){ if(e.isIntersecting){ clearTimeout(bail); setTimeout(start,600); o.disconnect(); } });
-  },{threshold:.35}).observe(panel);
+  run();
 })();
 
-/* ── agent grid, from the live API ────────────────────────────────────────
-   Renders the shipped roster immediately, then upgrades to live data. The
-   section is never empty, even offline. */
+/* ── agent grid, from the live API ────────────────────────────────────────── */
 (function agents(){
   var grid=document.getElementById('agentGrid');
   if(!grid) return;
 
   var FALLBACK_LIVE=['Memory','Tasks','Research','Finance','Jobs','News','Writing','Coach','Contacts','Invoice'];
-  var FALLBACK_PLANNED=[
-    ['Email','needs connecting'],['Calendar','needs connecting'],
-    ['WhatsApp','WhatsApp Business API'],['Travel','a booking provider'],
-    ['Trading','a brokerage API'],['Health','Apple Health or Google Fit'],
-    ['Shopping','a retail price API'],['Legal','document tooling'],
-    ['Social','LinkedIn or X API'],['Code','a repo connection']
-  ];
+  var FALLBACK_PLANNED=[['Email','needs connecting'],['Calendar','needs connecting'],
+    ['WhatsApp','WhatsApp Business API'],['Travel','a booking provider'],['Trading','a brokerage API'],
+    ['Health','Apple Health or Google Fit'],['Shopping','a retail price API'],['Legal','document tooling'],
+    ['Social','LinkedIn or X API'],['Code','a repo connection']];
 
   function esc(s){ return String(s).replace(/[&<>"]/g,function(c){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 
   function render(live,planned){
     grid.innerHTML =
-      live.map(function(n){
-        return '<div class="agent on"><span class="led"></span><span class="name">'+esc(n)+'</span></div>';
-      }).join('') +
-      planned.map(function(p){
-        return '<div class="agent off"><span class="led"></span><span class="name">'+esc(p[0])+
-               '</span><span class="needs">'+esc(p[1]||'')+'</span></div>';
-      }).join('');
-    var s=document.getElementById('statAgents'); if(s) s.textContent=live.length;
+      live.map(function(n){ return '<div class="agent on"><span class="led"></span><span class="name">'+esc(n)+'</span></div>'; }).join('')+
+      planned.map(function(p){ return '<div class="agent off"><span class="led"></span><span class="name">'+esc(p[0])+
+        '</span><span class="needs">'+esc(p[1]||'')+'</span></div>'; }).join('');
+    var s=document.getElementById('statAgents');
+    if(s){ s.dataset.to=live.length; if(s.textContent==='0'&&REDUCE) s.textContent=live.length; }
     var n=document.getElementById('navCount'); if(n) n.textContent=live.length+' agents connected';
+    stagger(grid,'.agent',45);
   }
 
   render(FALLBACK_LIVE,FALLBACK_PLANNED);
 
-  fetch('/api/atlas/agents')
-    .then(function(r){ return r.ok?r.json():null; })
-    .then(function(d){
-      if(!d||!d.live||!d.planned) return;
-      var trim=function(s){ return String(s).replace(/\s*Agent$/,''); };
-      render(
-        d.live.map(function(a){ return trim(a.name); }),
-        d.planned.map(function(a){
-          return [trim(a.name), a.needs==='configuration' ? 'needs connecting' : a.needs];
-        })
-      );
-    })
-    .catch(function(){});
+  fetch('/api/atlas/agents').then(function(r){ return r.ok?r.json():null; }).then(function(d){
+    if(!d||!d.live||!d.planned) return;
+    var trim=function(s){ return String(s).replace(/\s*Agent$/,''); };
+    render(d.live.map(function(a){ return trim(a.name); }),
+           d.planned.map(function(a){ return [trim(a.name), a.needs==='configuration'?'needs connecting':a.needs]; }));
+  }).catch(function(){});
 })();
 
 /* ── waitlist ─────────────────────────────────────────────────────────────── */
@@ -659,7 +820,6 @@ var wl=document.getElementById('wl');
 function openWL(){ wl.classList.add('on'); setTimeout(function(){ document.getElementById('wlEmail').focus(); },60); }
 function closeWL(){ wl.classList.remove('on'); document.getElementById('wlMsg').textContent=''; }
 addEventListener('keydown',function(e){ if(e.key==='Escape') closeWL(); });
-
 document.getElementById('wlGo').addEventListener('click',submitWL);
 document.getElementById('wlEmail').addEventListener('keydown',function(e){ if(e.key==='Enter') submitWL(); });
 
