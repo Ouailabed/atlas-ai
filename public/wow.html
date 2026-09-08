@@ -2,842 +2,1376 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ATLAS — Your Personal AI. Always Working.</title>
-<meta name="description" content="An autonomous AI operating system that handles your email, tasks, invoices and job applications — and tells you plainly what it cannot do.">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ATLAS — Your Personal AI</title>
+<meta name="description" content="A personal AI system that coordinates specialised agents across your tasks, finances, research and job search — and tells you plainly what it cannot do.">
+<meta name="theme-color" content="#08090C">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:title" content="ATLAS — Your Personal AI">
+<meta property="og:description" content="Twelve specialised agents. One coordinating intelligence. And an AI that tells you what it can't do.">
+<meta property="og:image" content="/og.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
 <style>
-/* ═══════════════════════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════════════════════════════════════
    ATLAS — landing page
 
-   Product-led, not image-led. Every panel is live DOM built from the app's own
-   tokens, not a screenshot: crisp at any resolution, a few KB rather than
-   megabytes, and every element can be choreographed on its own.
+   Standalone static file: no build step, no npm imports, no external requests.
+   Everything is hand-written CSS/SVG/DOM so first paint is immediate.
 
-   Motion is code-driven throughout — drifting light, a chat that actually runs,
-   counters, staggered reveals, parallax, cursor response. All of it composited
-   on transform/opacity so it stays cheap, and all of it disabled wholesale
-   under prefers-reduced-motion.
-   ═══════════════════════════════════════════════════════════════════════════ */
+   Two rules govern the whole design:
+
+   1. Show the product, never a picture of it. Every panel below is live DOM
+      built from the same tokens as the app. No screenshots, no generated art.
+
+   2. Never claim a capability the product does not have. The agent network
+      fetches /api/atlas/agents, so live vs planned status comes from
+      lib/agents.js at runtime and cannot drift from reality. Simulated
+      sequences are labelled as illustrative.
+   ══════════════════════════════════════════════════════════════════════════ */
 
 :root{
-  --paper:#f7f4ef;
-  --paper-2:#efeae1;
-  --ink:#14120f;
-  --ink-70:rgba(20,18,15,0.72);
-  /* 0.66 / 0.60 rather than 0.45 / 0.25: at 11px those measured 1.7:1 against
-     paper — unreadable, and far under the 4.5:1 AA floor. These clear 4.5 on
-     all three surfaces the page uses. Hierarchy comes from size and
-     letter-spacing instead of washing the ink out. */
-  --ink-45:rgba(20,18,15,0.66);
-  --ink-25:rgba(20,18,15,0.60);
-  --ink-12:rgba(20,18,15,0.12);
-  --ink-06:rgba(20,18,15,0.06);
-  --gold:#7d6022;          /* 5.36:1 on paper — #c9a84c is only 2.1:1 */
-  --gold-bright:#c9a84c;   /* the original, used only on dark panels */
-  --green:#2f7d4f;
-  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
-  --sans:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;
+  /* surface ladder — depth from layering, never from pure black */
+  --bg:#08090C; --bg-1:#0B0D12; --bg-2:#0E1117;
+  --surf:rgba(255,255,255,.035); --surf-2:rgba(255,255,255,.02);
+  --line:rgba(255,255,255,.075); --line-2:rgba(255,255,255,.14);
+
+  --tx:#F2F4F7; --tx-2:rgba(242,244,247,.62); --tx-3:rgba(242,244,247,.40);
+
+  /* colour carries meaning, not decoration */
+  --accent:#8AA2FF;              /* Atlas itself */
+  --live:#3DD68C;                /* connected and doing work */
+  --wait:#F5A524;                /* needs your approval */
+  --work:#7B8FFF;                /* processing */
+  --off:rgba(255,255,255,.22);   /* planned, not built */
+
+  --r-sm:8px; --r:12px; --r-lg:18px; --r-xl:24px;
+  --t-fast:.18s; --t:.32s; --t-slow:.7s;
   --ease:cubic-bezier(.16,1,.3,1);
+
+  --sans:"Inter","SF Pro Display",-apple-system,"Segoe UI Variable Display","Segoe UI",system-ui,sans-serif;
+  --mono:"SF Mono","Cascadia Mono","JetBrains Mono",ui-monospace,"Consolas",monospace;
+
+  --gut:clamp(20px,5vw,40px);
 }
 
 *{margin:0;padding:0;box-sizing:border-box}
-html{scroll-behavior:smooth}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
 body{
-  background:var(--paper);color:var(--ink);font-family:var(--sans);
-  -webkit-font-smoothing:antialiased;overflow-x:hidden;line-height:1.6;
+  background:var(--bg);color:var(--tx);font-family:var(--sans);
+  line-height:1.55;-webkit-font-smoothing:antialiased;
+  overflow-x:hidden;font-size:16px;
 }
+::selection{background:rgba(138,162,255,.28)}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
 
-/* ── living background ────────────────────────────────────────────────────
-   Three large, heavily blurred colour fields drifting on long loops, plus a
-   static grain plate. Pure transform animation, so it is GPU-composited and
-   costs essentially nothing — a canvas particle field would cost far more for
-   a less convincing result on a light ground. */
-#bg{position:fixed;inset:0;z-index:-2;overflow:hidden;pointer-events:none}
-.blob{position:absolute;border-radius:50%;filter:blur(90px);opacity:.55;will-change:transform}
-.blob.b1{width:52vw;height:52vw;left:-8vw;top:-12vw;
-  background:radial-gradient(circle,rgba(201,168,76,.30),transparent 68%);
-  animation:drift1 34s ease-in-out infinite}
-.blob.b2{width:46vw;height:46vw;right:-10vw;top:14vh;
-  background:radial-gradient(circle,rgba(120,150,190,.22),transparent 68%);
-  animation:drift2 44s ease-in-out infinite}
-.blob.b3{width:40vw;height:40vw;left:26vw;bottom:-14vw;
-  background:radial-gradient(circle,rgba(190,140,90,.20),transparent 68%);
-  animation:drift3 38s ease-in-out infinite}
-@keyframes drift1{0%,100%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(7vw,5vh,0) scale(1.12)}}
-@keyframes drift2{0%,100%{transform:translate3d(0,0,0) scale(1.06)}50%{transform:translate3d(-6vw,8vh,0) scale(1)}}
-@keyframes drift3{0%,100%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(5vw,-6vh,0) scale(1.1)}}
-/* A 90px blur across three large layers is the one genuinely expensive thing
-   here. Phones get a cheaper radius and no grain plate. */
-@media(max-width:760px){
-  .blob{filter:blur(58px);opacity:.45}
-  #grain{opacity:.18}
-}
-#grain{
-  position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.30;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
-}
+/* ── ambient depth ─────────────────────────────────────────────────────────
+   A faint grid plus two very low-opacity light sources. Deliberately quiet:
+   the background must never compete with the product panels. */
+#amb{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+#amb .grid{position:absolute;inset:-2px;
+  background-image:linear-gradient(rgba(255,255,255,.026) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(255,255,255,.026) 1px,transparent 1px);
+  background-size:64px 64px;
+  -webkit-mask-image:radial-gradient(ellipse 90% 60% at 50% 0%,#000 30%,transparent 78%);
+  mask-image:radial-gradient(ellipse 90% 60% at 50% 0%,#000 30%,transparent 78%)}
+#amb .lum{position:absolute;border-radius:50%;filter:blur(120px)}
+#amb .l1{width:60vw;height:46vw;left:50%;top:-24vw;transform:translateX(-50%);
+  background:radial-gradient(circle,rgba(122,142,255,.30),transparent 66%)}
+#amb .l2{width:50vw;height:44vw;right:-14vw;top:48vh;
+  background:radial-gradient(circle,rgba(61,214,140,.05),transparent 70%)}
 
 /* ── layout ───────────────────────────────────────────────────────────────── */
-.wrap{max-width:1180px;margin:0 auto;padding:0 32px;position:relative}
-section{padding:130px 0;position:relative}
-@media(max-width:760px){section{padding:80px 0}.wrap{padding:0 22px}}
+.wrap{max-width:1220px;margin:0 auto;padding:0 var(--gut)}
+.sec{padding:clamp(72px,11vw,148px) 0;position:relative}
+.sec-sm{padding:clamp(56px,8vw,104px) 0}
 
-.eyebrow{font-size:11px;letter-spacing:3.5px;text-transform:uppercase;color:var(--gold);font-weight:600;margin-bottom:20px}
-h1,h2,h3{font-weight:400;letter-spacing:-0.03em;line-height:1.06}
-h1{font-size:clamp(44px,6.1vw,76px)}
-h2{font-size:clamp(34px,4.6vw,60px)}
-h3{font-size:clamp(20px,2.2vw,26px);letter-spacing:-0.02em;line-height:1.25}
-em{font-family:var(--serif);font-style:italic;font-weight:400}
-.lead{font-size:clamp(17px,1.65vw,20px);color:var(--ink-70);max-width:56ch;line-height:1.65}
+/* ── type scale ───────────────────────────────────────────────────────────── */
+h1,h2,h3,h4{font-weight:500;letter-spacing:-.035em;line-height:1.02}
+h1{font-size:clamp(38px,6.6vw,80px);letter-spacing:-.045em;text-wrap:balance}
+.h1-sub{display:block;font-size:.58em;color:var(--tx-3);letter-spacing:-.03em;margin-top:.12em}
+h2{font-size:clamp(30px,4.9vw,60px);line-height:1.05}
+h3{font-size:clamp(20px,2.3vw,27px);letter-spacing:-.025em;line-height:1.2}
+h4{font-size:15px;letter-spacing:-.01em;font-weight:600}
+.lead{font-size:clamp(16px,1.5vw,19px);color:var(--tx-2);max-width:60ch;line-height:1.62}
+.dim{color:var(--tx-3)}
 
-/* ── nav ──────────────────────────────────────────────────────────────────── */
-nav{
-  position:fixed;top:0;left:0;right:0;z-index:900;
-  display:flex;align-items:center;justify-content:space-between;padding:18px 32px;
-  background:rgba(247,244,239,0);backdrop-filter:blur(0px);
-  border-bottom:1px solid transparent;transition:background .4s,backdrop-filter .4s,border-color .4s;
+.kicker{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--tx-3);display:inline-flex;align-items:center;gap:9px;margin-bottom:22px}
+.kicker::before{content:'';width:14px;height:1px;background:var(--line-2)}
+
+.sec-head{max-width:760px;margin-bottom:clamp(38px,5vw,64px)}
+/* the agent section heading sits tighter to its diagram than a normal head */
+.net-head{margin-bottom:clamp(16px,2vw,26px)}
+.sec-head .lead{margin-top:20px}
+
+/* ── mark + nav ───────────────────────────────────────────────────────────── */
+.mark{width:24px;height:24px;flex-shrink:0;color:var(--accent)}
+.wordmark{font-size:15px;font-weight:600;letter-spacing:.22em}
+
+nav{position:fixed;top:14px;left:0;right:0;z-index:800;display:flex;justify-content:center;
+  padding:0 var(--gut);pointer-events:none}
+.navbar{
+  pointer-events:auto;display:flex;align-items:center;gap:28px;
+  padding:9px 9px 9px 18px;border-radius:100px;
+  background:rgba(11,13,18,.62);border:1px solid var(--line);
+  backdrop-filter:blur(20px) saturate(150%);-webkit-backdrop-filter:blur(20px) saturate(150%);
+  box-shadow:0 8px 30px -12px rgba(0,0,0,.7);
+  transition:background var(--t),border-color var(--t),padding var(--t);
+  max-width:100%;
 }
-nav.stuck{background:rgba(247,244,239,.78);backdrop-filter:blur(18px);border-bottom-color:var(--ink-06)}
-.logo{font-size:16px;font-weight:700;letter-spacing:5px;text-decoration:none;color:var(--ink)}
-.nav-links{display:flex;gap:34px;list-style:none}
-.nav-links a{font-size:13px;color:var(--ink-45);text-decoration:none;position:relative}
-.nav-links a::after{content:'';position:absolute;left:0;right:100%;bottom:-4px;height:1px;
-  background:var(--ink);transition:right .4s var(--ease)}
-.nav-links a:hover{color:var(--ink)}
-.nav-links a:hover::after{right:0}
-@media(max-width:820px){.nav-links{display:none}}
+nav.stuck .navbar{background:rgba(11,13,18,.9);border-color:var(--line-2);padding-top:7px;padding-bottom:7px}
+.nav-brand{display:flex;align-items:center;gap:10px;text-decoration:none}
+.nav-links{display:flex;gap:4px;list-style:none}
+.nav-links a{display:block;padding:7px 13px;border-radius:100px;font-size:13.5px;
+  color:var(--tx-3);text-decoration:none;transition:color var(--t-fast),background var(--t-fast)}
+.nav-links a:hover{color:var(--tx);background:var(--surf)}
+@media(max-width:900px){.nav-links{display:none}}
 
-/* scroll progress hairline */
-#prog{position:fixed;top:0;left:0;height:2px;width:0;background:var(--gold);z-index:950;transition:width .1s linear}
-
-.btn{
-  display:inline-flex;align-items:center;gap:9px;padding:13px 26px;border-radius:100px;
-  border:1px solid transparent;font-size:13.5px;font-weight:600;font-family:inherit;
-  text-decoration:none;cursor:pointer;white-space:nowrap;position:relative;overflow:hidden;
-  transition:transform .3s var(--ease),box-shadow .3s var(--ease),border-color .3s,color .3s;
-}
-.btn-primary{background:var(--ink);color:var(--paper)}
-.btn-primary:hover{transform:translateY(-2px);box-shadow:0 14px 30px -8px rgba(20,18,15,.4)}
-.btn-primary svg{transition:transform .3s var(--ease)}
-.btn-primary:hover svg{transform:translateX(4px)}
-.btn-ghost{border-color:var(--ink-12);color:var(--ink-70);background:transparent}
-.btn-ghost:hover{border-color:var(--ink);color:var(--ink);transform:translateY(-2px)}
-
-/* ── hero ─────────────────────────────────────────────────────────────────── */
-#hero{padding-top:180px;padding-bottom:70px}
-@media(max-width:760px){#hero{padding-top:130px}}
-.hero-grid{display:grid;grid-template-columns:1.05fr 1fr;gap:64px;align-items:center}
-@media(max-width:980px){.hero-grid{grid-template-columns:1fr;gap:48px}}
-.hero-sub{margin:26px 0 34px}
-.hero-actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-.hero-note{font-size:12.5px;color:var(--ink-25);margin-top:20px;letter-spacing:.3px}
-
-/* headline reveals line by line under a mask */
-.lineMask{display:block;overflow:hidden}
-.lineMask>span{display:block;transform:translateY(102%);transition:transform 1s var(--ease)}
-.in .lineMask>span,.lineMask.in>span{transform:none}
+/* ── buttons ──────────────────────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:11px 20px;border-radius:100px;font-family:inherit;font-size:14px;font-weight:500;
+  text-decoration:none;cursor:pointer;border:1px solid transparent;white-space:nowrap;
+  transition:transform var(--t-fast),background var(--t),border-color var(--t),color var(--t)}
+.btn:active{transform:scale(.98)}
+.btn-1{background:var(--tx);color:#08090C;font-weight:600}
+.btn-1:hover{background:#fff}
+.btn-2{background:var(--surf);color:var(--tx);border-color:var(--line)}
+.btn-2:hover{background:rgba(255,255,255,.07);border-color:var(--line-2)}
+.btn-3{color:var(--tx-2);padding-left:10px;padding-right:10px}
+.btn-3:hover{color:var(--tx)}
+.btn-lg{padding:14px 26px;font-size:15px}
 
 /* ── panels ───────────────────────────────────────────────────────────────── */
-.panel{
-  background:#fff;border:1px solid var(--ink-06);border-radius:18px;
-  box-shadow:0 1px 2px rgba(20,18,15,.04), 0 22px 50px -22px rgba(20,18,15,.28);
-  overflow:hidden;transition:transform .5s var(--ease),box-shadow .5s var(--ease);
-  transform-style:preserve-3d;
-}
-.panel-bar{display:flex;align-items:center;gap:9px;padding:13px 16px;
-  border-bottom:1px solid var(--ink-06);background:linear-gradient(#fff,#fcfaf7)}
-.dot{width:9px;height:9px;border-radius:50%;background:var(--ink-12);display:inline-block}
-.panel-title{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--ink-25);margin-left:6px;font-weight:600}
-.atlas-mark{width:26px;height:26px;border-radius:50%;flex-shrink:0;
-  background:linear-gradient(135deg,#c9a84c,#e8c96a);display:flex;align-items:center;
-  justify-content:center;font-size:11px;font-weight:800;color:#14120f}
-.pulse{position:relative}
-.pulse::after{content:'';position:absolute;inset:0;border-radius:50%;
-  border:1px solid rgba(201,168,76,.7);animation:ring 2.4s ease-out infinite}
-@keyframes ring{0%{transform:scale(1);opacity:.8}100%{transform:scale(2.1);opacity:0}}
+.panel{background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.018));
+  border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;
+  box-shadow:0 30px 70px -40px rgba(0,0,0,.9)}
+.panel-hd{display:flex;align-items:center;gap:10px;padding:12px 16px;
+  border-bottom:1px solid var(--line);background:rgba(255,255,255,.018)}
+.panel-t{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--tx-3)}
+.panel-bd{padding:18px}
 
-/* ── chat ─────────────────────────────────────────────────────────────────── */
-.chat{padding:20px;min-height:290px}
-.msg{display:flex;gap:11px;margin-bottom:16px;align-items:flex-end}
-.msg.at{align-items:flex-start}
-.msg.me{justify-content:flex-end}
-.bubble{max-width:80%;padding:12px 16px;border-radius:16px;font-size:14.5px;line-height:1.6}
-.msg.me .bubble{background:var(--ink);color:var(--paper);border-bottom-right-radius:5px}
-.msg.at .bubble{background:var(--paper-2);color:var(--ink);border-bottom-left-radius:5px}
-.msg.enter{animation:msgIn .55s var(--ease) both}
-@keyframes msgIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
-.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}
-.chip{font-size:10.5px;padding:3px 10px;border-radius:999px;border:1px solid var(--ink-12);
-  color:var(--ink-45);display:inline-flex;align-items:center;gap:5px;
-  animation:chipIn .45s var(--ease) both}
-@keyframes chipIn{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:none}}
-.chip .led{width:6px;height:6px;border-radius:50%;background:var(--ink-12)}
-.chip.live{border-color:rgba(47,125,79,.3);color:var(--green);background:rgba(47,125,79,.05)}
-.chip.live .led{background:var(--green)}
-.saved{margin-top:13px;padding-top:13px;border-top:1px dashed var(--ink-12);font-size:12px;color:var(--ink-45)}
-.saved b{color:var(--green);font-weight:600}
-.caret{display:inline-block;width:2px;height:1em;background:var(--paper);
-  vertical-align:-2px;margin-left:1px;animation:blink 1s steps(2) infinite}
+/* status dot — the vocabulary used across the whole page */
+.st{width:6px;height:6px;border-radius:50%;flex-shrink:0;display:inline-block}
+.st-live{background:var(--live);box-shadow:0 0 0 3px rgba(61,214,140,.13)}
+.st-work{background:var(--work);box-shadow:0 0 0 3px rgba(123,143,255,.14)}
+.st-wait{background:var(--wait);box-shadow:0 0 0 3px rgba(245,165,36,.14)}
+.st-off{background:var(--off)}
+.pulse{animation:pulse 2s var(--ease) infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.42}}
+
+.tag{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;
+  letter-spacing:.1em;text-transform:uppercase;padding:3px 9px;border-radius:100px;
+  border:1px solid var(--line);color:var(--tx-3);background:var(--surf-2)}
+.tag-live{color:var(--live);border-color:rgba(61,214,140,.26);background:rgba(61,214,140,.07)}
+.tag-wait{color:var(--wait);border-color:rgba(245,165,36,.26);background:rgba(245,165,36,.07)}
+.tag-work{color:var(--work);border-color:rgba(123,143,255,.26);background:rgba(123,143,255,.07)}
+
+/* "this is a simulation" marker — used on every illustrative sequence */
+.demo-note{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:rgba(242,244,247,.28);display:flex;align-items:center;gap:7px;margin-top:14px}
+.demo-note::before{content:'';width:12px;height:1px;background:rgba(255,255,255,.14)}
+
+/* ── hero ─────────────────────────────────────────────────────────────────── */
+#hero{padding-top:clamp(120px,17vw,190px);padding-bottom:clamp(56px,8vw,96px)}
+.hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center}
+@media(max-width:1000px){.hero-grid{grid-template-columns:1fr;gap:44px}}
+.hero-cta{display:flex;gap:10px;flex-wrap:wrap;margin-top:34px}
+.hero-meta{display:flex;gap:22px;flex-wrap:wrap;margin-top:28px;font-size:13.5px;color:var(--tx-3)}
+.hero-meta b{color:var(--tx-2);font-weight:600}
+.hero-meta span{display:inline-flex;align-items:center;gap:7px}
+
+/* ── the hero orchestration panel ─────────────────────────────────────────── */
+.orch{min-height:376px;display:flex;flex-direction:column}
+.orch-body{padding:16px;flex:1;display:flex;flex-direction:column;gap:12px}
+.orch-body .demo-note{margin-top:auto;padding-top:10px}
+.rail{display:flex;flex-wrap:wrap;gap:5px;padding-top:13px;margin-top:auto;border-top:1px solid var(--line)}
+.rail-i{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:100px;
+  border:1px solid var(--line);background:var(--surf-2);font-size:10.5px;color:var(--tx-3);
+  opacity:.42;transition:opacity var(--t),border-color var(--t),color var(--t)}
+.rail-i svg{width:10px;height:10px}
+.rail-i.on{opacity:1;border-color:rgba(61,214,140,.32);color:var(--tx-2);background:rgba(61,214,140,.06)}
+.rail-i.off-agent{border-style:dashed}
+.rail-i.blocked{opacity:1;border-color:rgba(245,165,36,.34);color:var(--wait);background:rgba(245,165,36,.06)}
+.req{display:flex;gap:10px;align-items:flex-start}
+.req-av{width:22px;height:22px;border-radius:50%;background:var(--surf);border:1px solid var(--line);
+  font-size:9.5px;display:flex;align-items:center;justify-content:center;color:var(--tx-3);flex-shrink:0;margin-top:1px}
+.req-tx{font-size:14.5px;line-height:1.5}
+.caret{display:inline-block;width:1.5px;height:1em;background:var(--accent);vertical-align:-2px;
+  margin-left:2px;animation:blink 1.1s steps(2) infinite}
 @keyframes blink{50%{opacity:0}}
-.typing{display:inline-flex;gap:4px;padding:4px 2px}
-.typing i{width:6px;height:6px;border-radius:50%;background:var(--ink-25);animation:bob 1.1s infinite}
-.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
-@keyframes bob{0%,60%,100%{transform:translateY(0);opacity:.45}30%{transform:translateY(-5px);opacity:1}}
 
-/* ── agent grid ───────────────────────────────────────────────────────────── */
-.agents{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:9px;margin-top:44px}
-.agent{display:flex;align-items:center;gap:10px;padding:13px 15px;border-radius:11px;
-  border:1px solid var(--ink-06);background:#fff;font-size:13.5px;
-  transition:opacity .5s var(--ease),transform .5s var(--ease),box-shadow .3s}
-/* Hidden ONLY once JS has set html.anim, i.e. once something is guaranteed to
-   reveal it. Content that depends on script to become visible has already
-   shipped broken on this page once. */
-html.anim .agent{opacity:0;transform:translateY(14px)}
-html.anim .agent.lit{opacity:1;transform:none}
-.agent:hover{box-shadow:0 8px 20px -10px rgba(20,18,15,.3)}
-.agent .led{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.agent.on .led{background:var(--green);box-shadow:0 0 0 3px rgba(47,125,79,.14)}
-.agent.on.lit .led{animation:led .5s var(--ease)}
-@keyframes led{0%{box-shadow:0 0 0 0 rgba(47,125,79,.5)}100%{box-shadow:0 0 0 3px rgba(47,125,79,.14)}}
-.agent.off{background:transparent;border-style:dashed}
-.agent.off .led{background:var(--ink-12)}
-.agent.off .name{color:var(--ink-25)}
-.agent .needs{margin-left:auto;font-size:10.5px;color:var(--ink-25);text-align:right;line-height:1.3}
-.legend{display:flex;gap:22px;flex-wrap:wrap;margin-top:26px;font-size:12.5px;color:var(--ink-45)}
-.legend span{display:inline-flex;align-items:center;gap:7px}
-.swatch{width:7px;height:7px;border-radius:50%;display:inline-block}
+.think{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;
+  letter-spacing:.08em;color:var(--tx-3);padding:6px 0}
+.think .bar{flex:1;height:1px;background:var(--line);position:relative;overflow:hidden}
+.think .bar::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,var(--accent),transparent);
+  animation:sweep 1.5s var(--ease) infinite}
+@keyframes sweep{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
 
-/* ── dashboard ────────────────────────────────────────────────────────────── */
-.dash{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--ink-06)}
-@media(max-width:620px){.dash{grid-template-columns:1fr}}
-.cell{background:#fff;padding:18px 20px}
-.cell-l{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:13px}
-.row{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--ink-06);font-size:13.5px;
-  transition:opacity .5s var(--ease),transform .5s var(--ease)}
-html.anim .row{opacity:0;transform:translateX(-10px)}
-html.anim .row.lit{opacity:1;transform:none}
-.row:last-child{border-bottom:0}
-.row .tick{width:17px;height:17px;border-radius:50%;border:1.5px solid var(--ink-12);flex-shrink:0}
-.row .amt{margin-left:auto;font-weight:600;font-variant-numeric:tabular-nums}
-.sub{font-size:11.5px;color:var(--ink-25)}
-.new-flag{font-size:9.5px;letter-spacing:1px;text-transform:uppercase;color:var(--green);
-  background:rgba(47,125,79,.09);padding:2px 7px;border-radius:999px;margin-left:auto;font-weight:700}
-.row.lit .new-flag{animation:pop .5s var(--ease) .25s both}
-@keyframes pop{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:none}}
+.steps{display:flex;flex-direction:column;gap:7px}
+.step{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:var(--r);
+  background:var(--surf-2);border:1px solid var(--line);
+  opacity:0;transform:translateY(6px);animation:stepIn .5s var(--ease) forwards}
+@keyframes stepIn{to{opacity:1;transform:none}}
+.step-ic{width:26px;height:26px;border-radius:7px;background:var(--surf);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--tx-2)}
+.step-ic svg{width:13px;height:13px}
+.step-txt{display:flex;flex-direction:column;min-width:0;gap:2px}
+.step-n{font-size:13px;font-weight:500;line-height:1.2}
+.step-d{font-size:11.5px;color:var(--tx-3);line-height:1.35}
+.step-r{margin-left:auto;flex-shrink:0}
+.step-time{font-family:var(--mono);font-size:10px;color:var(--tx-3);margin-left:auto;flex-shrink:0}
+
+.approve{border-color:rgba(245,165,36,.3);background:rgba(245,165,36,.045)}
+.approve-actions{display:flex;gap:7px;margin-left:auto}
+.mini{padding:5px 12px;border-radius:100px;font-size:11.5px;font-family:inherit;cursor:pointer;
+  border:1px solid var(--line);background:var(--surf);color:var(--tx-2);transition:all var(--t-fast)}
+/* touch targets: 5px padding gives a ~26px control, below the 40px comfortable
+   minimum on a phone. Widen only where there is no mouse. */
+@media(hover:none){.mini{padding:11px 16px;font-size:12.5px}}
+.mini:hover{border-color:var(--line-2);color:var(--tx)}
+.mini-y{background:var(--wait);border-color:var(--wait);color:#1a1206;font-weight:600}
+.mini-y:hover{background:#ffb838}
+
+/* ── comparison ───────────────────────────────────────────────────────────── */
+.vs{display:grid;grid-template-columns:1fr 1fr;gap:clamp(14px,2.4vw,22px)}
+@media(max-width:800px){.vs{grid-template-columns:1fr}}
+.vs-col{padding:clamp(22px,3vw,32px);border-radius:var(--r-lg);border:1px solid var(--line);background:var(--surf-2)}
+.vs-col.on{background:linear-gradient(180deg,rgba(138,162,255,.07),rgba(255,255,255,.015));
+  border-color:rgba(138,162,255,.24)}
+.vs-h{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--tx-3);margin-bottom:20px}
+.vs-col.on .vs-h{color:var(--accent)}
+.flow{display:flex;flex-direction:column;gap:0}
+.flow-i{display:flex;align-items:center;gap:12px;padding:11px 0;font-size:14.5px}
+.flow-i .n{font-family:var(--mono);font-size:10.5px;color:var(--tx-3);width:18px;flex-shrink:0}
+.flow-l{width:1px;height:14px;background:var(--line);margin-left:8px}
+.vs-col.on .flow-l{background:linear-gradient(var(--accent),rgba(138,162,255,.2))}
+.vs-end{margin-top:20px;padding-top:18px;border-top:1px solid var(--line);font-size:13.5px;color:var(--tx-3)}
+
+/* ── agent network ────────────────────────────────────────────────────────── */
+.net-wrap{position:relative;display:grid;grid-template-columns:1fr 320px;gap:32px;align-items:center}
+@media(max-width:1080px){
+  .net-wrap{grid-template-columns:1fr;gap:22px}
+  .net{aspect-ratio:1/.72}
+  .net-info{max-width:560px;margin:0 auto;min-height:0}
+}
+.net{position:relative;width:100%;aspect-ratio:1/.60;min-height:360px}
+.net svg.wires{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.wire{stroke:rgba(255,255,255,.10);stroke-width:1;fill:none;transition:stroke var(--t),stroke-width var(--t)}
+.wire.hot{stroke:var(--accent);stroke-width:1.6}
+.core{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:104px;height:104px;border-radius:50%;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:3px;z-index:3;
+  background:radial-gradient(circle at 50% 35%,rgba(138,162,255,.22),rgba(11,13,18,.96) 68%);
+  border:1px solid rgba(138,162,255,.34);
+  box-shadow:0 0 50px -8px rgba(138,162,255,.34), inset 0 0 26px rgba(138,162,255,.07)}
+.core .mark{width:26px;height:26px}
+.core b{font-size:10px;letter-spacing:.2em;font-weight:600;color:var(--tx)}
+.core i{font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;color:var(--tx-3);font-style:normal}
+.core::after{content:'';position:absolute;inset:-9px;border-radius:50%;
+  border:1px solid rgba(138,162,255,.16);animation:halo 3.4s var(--ease) infinite}
+@keyframes halo{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.07);opacity:.18}}
+
+.node{position:absolute;transform:translate(-50%,-50%);z-index:2;
+  display:flex;align-items:center;gap:8px;padding:7px 12px 7px 9px;border-radius:100px;
+  background:rgba(11,13,18,.92);border:1px solid var(--line);cursor:pointer;
+  /* buttons inherit neither font nor colour — without these the node label falls
+     back to the UA default and currentColor resolves to black on black */
+  font-family:inherit;color:var(--tx-2);
+  transition:border-color var(--t),background var(--t),transform var(--t);white-space:nowrap}
+.node:hover,.node.sel{border-color:var(--line-2);background:rgba(20,23,32,.98);transform:translate(-50%,-50%) scale(1.05)}
+.node.sel{border-color:rgba(138,162,255,.5)}
+.node svg{width:13px;height:13px;color:var(--tx-2);flex-shrink:0}
+.node span{font-size:12.5px;color:var(--tx-2)}
+.node.off{border-style:dashed;opacity:.62}
+.node.off span{color:var(--tx-3)}
+
+.net-info{padding:22px;border-radius:var(--r-lg);border:1px solid var(--line);background:var(--surf-2);min-height:240px}
+.net-info .ic{width:34px;height:34px;border-radius:9px;background:var(--surf);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+.net-info .ic svg{width:16px;height:16px;color:var(--accent)}
+.net-info h4{margin-bottom:6px;font-size:16px}
+.net-info p{font-size:13.5px;color:var(--tx-2);line-height:1.6;margin-bottom:14px}
+.net-info .ex{font-family:var(--mono);font-size:11.5px;color:var(--tx-3);padding:11px 13px;
+  border-radius:var(--r);background:rgba(0,0,0,.28);border:1px solid var(--line);line-height:1.5}
+
+/* mobile: the radial layout stops working — become a grouped list */
+.net-list{display:none;gap:8px;flex-direction:column}
+.net-li{display:flex;align-items:center;gap:11px;padding:12px 14px;border-radius:var(--r);
+  border:1px solid var(--line);background:var(--surf-2)}
+.net-li svg{width:14px;height:14px;color:var(--tx-2);flex-shrink:0}
+.net-li .nm{font-size:14px}
+.net-li .ds{font-size:12px;color:var(--tx-3);margin-top:1px}
+.net-li .tg{margin-left:auto;flex-shrink:0}
+.net-li.off{border-style:dashed;opacity:.62}
+@media(max-width:760px){
+  .net,.net-info{display:none}
+  .net-list{display:flex}
+  .net-wrap{grid-template-columns:1fr}
+}
+
+/* ── workflows ────────────────────────────────────────────────────────────── */
+.wf-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:clamp(14px,2vw,20px)}
+@media(max-width:860px){.wf-grid{grid-template-columns:1fr}}
+.wf{border-radius:var(--r-lg);border:1px solid var(--line);background:var(--surf-2);overflow:hidden}
+.wf-hd{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.wf-hd .tag{margin-left:auto}
+.wf-say{padding:16px 18px;font-size:14.5px;border-bottom:1px solid var(--line);
+  background:rgba(0,0,0,.2);color:var(--tx)}
+.wf-say .q{color:var(--tx-3);font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;
+  text-transform:uppercase;display:block;margin-bottom:7px}
+.wf-steps{padding:14px 18px;display:flex;flex-direction:column;gap:0}
+.wf-s{display:flex;align-items:center;gap:11px;padding:8px 0;font-size:13.5px;color:var(--tx-2)}
+.wf-s .st{margin-left:auto}
+.wf-out{padding:14px 18px;border-top:1px solid var(--line);display:flex;align-items:center;
+  gap:10px;font-size:13.5px;background:rgba(61,214,140,.04)}
+
+/* ── split feature rows ───────────────────────────────────────────────────── */
+.split{display:grid;grid-template-columns:1fr 1.08fr;gap:clamp(32px,5vw,64px);align-items:center}
+.split.rev{grid-template-columns:1.08fr 1fr}
+@media(max-width:980px){.split,.split.rev{grid-template-columns:1fr;gap:34px}.split.rev .copy{order:-1}}
+
+.mem-row{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid var(--line);font-size:13.5px}
+.mem-row:last-child{border-bottom:0}
+.mem-row .k{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--tx-3);width:82px;flex-shrink:0}
+
+/* ── live status board ────────────────────────────────────────────────────── */
+.board{display:grid;grid-template-columns:1fr 1fr;gap:clamp(14px,2vw,20px)}
+@media(max-width:800px){.board{grid-template-columns:1fr}}
+.board-col{border-radius:var(--r-lg);border:1px solid var(--line);background:var(--surf-2);padding:22px}
+.board-col.on{border-color:rgba(61,214,140,.2);background:linear-gradient(180deg,rgba(61,214,140,.05),transparent)}
+.board-h{display:flex;align-items:center;gap:10px;margin-bottom:16px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--tx-3)}
+.board-h b{margin-left:auto;font-size:19px;font-family:var(--sans);letter-spacing:-.02em;color:var(--tx)}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:100px;
+  border:1px solid var(--line);background:var(--surf-2);font-size:12.5px;color:var(--tx-2)}
+.chip.off{border-style:dashed;color:var(--tx-3)}
+
+/* ── command centre ───────────────────────────────────────────────────────── */
+.cc{border-radius:var(--r-xl);border:1px solid var(--line);overflow:hidden;
+  background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.012));
+  box-shadow:0 50px 110px -60px rgba(0,0,0,1)}
+.cc-bar{display:flex;align-items:center;gap:8px;padding:11px 16px;border-bottom:1px solid var(--line);
+  background:rgba(0,0,0,.26)}
+.cc-dot{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.12)}
+.cc-url{margin-left:12px;font-family:var(--mono);font-size:11px;color:var(--tx-3);
+  padding:4px 12px;border-radius:100px;background:var(--surf-2);border:1px solid var(--line)}
+.cc-body{display:grid;grid-template-columns:190px 1fr 264px;min-height:400px}
+@media(max-width:1000px){.cc-body{grid-template-columns:1fr}.cc-side,.cc-ctx{display:none}}
+.cc-side{border-right:1px solid var(--line);padding:16px 12px;background:rgba(0,0,0,.15)}
+.cc-nav{display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:var(--r-sm);
+  font-size:13px;color:var(--tx-3);cursor:default}
+.cc-nav.on{background:var(--surf);color:var(--tx)}
+.cc-nav svg{width:14px;height:14px}
+.cc-main{padding:24px;border-right:1px solid var(--line)}
+.cc-ctx{padding:18px;background:rgba(0,0,0,.15)}
+.cc-stat{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0 22px}
+.cc-stat div{padding:13px;border-radius:var(--r);border:1px solid var(--line);background:var(--surf-2)}
+.cc-stat b{display:block;font-size:24px;font-weight:500;letter-spacing:-.03em}
+.cc-stat span{font-size:11px;color:var(--tx-3)}
+.feed{display:flex;flex-direction:column}
+.feed-i{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.feed-i:last-child{border-bottom:0}
+.feed-i time{font-family:var(--mono);font-size:11px;color:var(--tx-3);width:44px;flex-shrink:0;padding-top:1px}
+.feed-i .ag{color:var(--tx-3);font-size:12px}
 
 /* ── jobs ─────────────────────────────────────────────────────────────────── */
-.jobs-grid{display:grid;grid-template-columns:auto 1fr;gap:26px;align-items:center;padding:22px}
-@media(max-width:620px){.jobs-grid{grid-template-columns:1fr;gap:16px}}
-.score{text-align:center;min-width:112px}
-.score-n{font-size:52px;font-weight:300;letter-spacing:-3px;line-height:1;color:var(--green);font-variant-numeric:tabular-nums}
-.score-l{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--ink-25);margin-top:5px}
-.gaps{display:grid;grid-template-columns:1fr 1fr;gap:18px;font-size:13px}
-@media(max-width:520px){.gaps{grid-template-columns:1fr}}
-.gaps h4{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;font-weight:700}
-.gaps ul{list-style:none}
-.gaps li{padding:3px 0;color:var(--ink-70);display:flex;gap:7px}
-.docs{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--ink-06);border-top:1px solid var(--ink-06)}
-@media(max-width:620px){.docs{grid-template-columns:1fr}}
-.doc{background:#fff;padding:16px 20px}
-.doc pre{font-family:var(--sans);font-size:11.5px;line-height:1.75;color:var(--ink-45);
-  white-space:pre-wrap;max-height:132px;overflow:hidden;
-  -webkit-mask-image:linear-gradient(#000 68%,transparent);mask-image:linear-gradient(#000 68%,transparent)}
-
-/* ── split rows ───────────────────────────────────────────────────────────── */
-.split{display:grid;grid-template-columns:1fr 1.15fr;gap:64px;align-items:center}
-.split.flip{grid-template-columns:1.15fr 1fr}
-@media(max-width:980px){.split,.split.flip{grid-template-columns:1fr;gap:36px}.split.flip .copy{order:-1}}
-
-/* ── stats ────────────────────────────────────────────────────────────────── */
-#stats{border-top:1px solid var(--ink-06);border-bottom:1px solid var(--ink-06);padding:60px 0}
-.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:26px;text-align:center}
-@media(max-width:760px){.stats-grid{grid-template-columns:repeat(2,1fr);gap:34px}}
-.stat-n{font-size:clamp(30px,3.6vw,44px);font-weight:300;letter-spacing:-2px;font-variant-numeric:tabular-nums}
-.stat-l{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--ink-25);margin-top:7px}
+.job{display:grid;grid-template-columns:1fr 132px;gap:20px;padding:20px;
+  border-bottom:1px solid var(--line);align-items:center}
+@media(max-width:620px){.job{grid-template-columns:1fr;gap:14px}}
+.score{text-align:center}
+.score b{font-size:38px;font-weight:400;letter-spacing:-.04em;color:var(--live);display:block;line-height:1}
+.score span{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--tx-3)}
+.job-docs{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:18px 20px}
+@media(max-width:620px){.job-docs{grid-template-columns:1fr}}
+.job-doc{padding:13px 15px;border-radius:var(--r);border:1px solid var(--line);background:var(--surf-2)}
+.job-doc .h{display:flex;align-items:center;gap:8px;font-size:12.5px;margin-bottom:8px}
+.job-doc p{font-size:11.5px;line-height:1.65;color:var(--tx-3);
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 
 /* ── pricing ──────────────────────────────────────────────────────────────── */
-.price-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:840px;margin:52px auto 0}
-@media(max-width:760px){.price-grid{grid-template-columns:1fr}}
-.price-card{border:1px solid var(--ink-12);border-radius:20px;padding:38px 34px;background:#fff;
-  transition:transform .45s var(--ease),box-shadow .45s var(--ease)}
-.price-card:hover{transform:translateY(-6px);box-shadow:0 24px 50px -22px rgba(20,18,15,.32)}
-.price-card.pop{background:var(--ink);color:var(--paper);border-color:var(--ink);position:relative}
-.pop-badge{position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:var(--gold-bright);
-  color:#14120f;font-size:9.5px;font-weight:800;letter-spacing:1.5px;padding:5px 14px;border-radius:999px}
-.price-name{font-size:12px;letter-spacing:2.5px;text-transform:uppercase;color:var(--ink-45)}
-.price-card.pop .price-name{color:rgba(247,244,239,.6)}
-.price-amt{font-size:52px;font-weight:300;letter-spacing:-2.5px;margin:14px 0 2px}
-.price-per{font-size:12.5px;color:var(--ink-25);margin-bottom:26px}
-.price-card.pop .price-per{color:rgba(247,244,239,.55)}
-.price-feats{list-style:none;margin-bottom:30px}
-.price-feats li{padding:8px 0;font-size:14px;display:flex;gap:11px;color:var(--ink-70)}
-.price-card.pop .price-feats li{color:rgba(247,244,239,.85)}
-.price-feats i{color:var(--gold);font-weight:700;font-style:normal}
-.price-card.pop .price-feats i{color:var(--gold-bright)}
-.price-btn{width:100%;justify-content:center}
+.price{display:grid;grid-template-columns:1fr 1fr;gap:clamp(14px,2vw,20px);max-width:900px;margin:0 auto}
+@media(max-width:800px){.price{grid-template-columns:1fr}}
+.pc{padding:clamp(26px,3.4vw,38px);border-radius:var(--r-xl);border:1px solid var(--line);
+  background:var(--surf-2);position:relative;transition:border-color var(--t),transform var(--t)}
+.pc:hover{border-color:var(--line-2);transform:translateY(-3px)}
+.pc.on{background:linear-gradient(180deg,rgba(138,162,255,.08),rgba(255,255,255,.012));
+  border-color:rgba(138,162,255,.28)}
+.pc-badge{position:absolute;top:-1px;right:24px;transform:translateY(-50%);
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+  padding:4px 11px;border-radius:100px;background:var(--accent);color:#0a0d18;font-weight:700}
+.pc-n{font-family:var(--mono);font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--tx-3)}
+.pc-p{font-size:46px;font-weight:400;letter-spacing:-.045em;margin:14px 0 2px}
+.pc-p span{font-size:15px;color:var(--tx-3);letter-spacing:0}
+.pc-d{font-size:13.5px;color:var(--tx-2);margin-bottom:24px;min-height:38px}
+.pc-f{list-style:none;margin-bottom:26px;display:flex;flex-direction:column;gap:11px}
+.pc-f li{display:flex;gap:11px;font-size:13.5px;color:var(--tx-2);align-items:flex-start}
+.pc-f svg{width:14px;height:14px;color:var(--live);flex-shrink:0;margin-top:3px}
+
+/* ── faq ──────────────────────────────────────────────────────────────────── */
+.faq{max-width:800px;margin:0 auto;border-top:1px solid var(--line)}
+.fq{border-bottom:1px solid var(--line)}
+.fq button{width:100%;display:flex;align-items:center;gap:18px;padding:21px 4px;
+  background:none;border:0;color:var(--tx);font-family:inherit;font-size:15.5px;
+  text-align:left;cursor:pointer;transition:color var(--t-fast)}
+.fq button:hover{color:var(--accent)}
+.fq .pm{margin-left:auto;width:13px;height:13px;flex-shrink:0;position:relative}
+.fq .pm::before,.fq .pm::after{content:'';position:absolute;background:var(--tx-3);
+  left:50%;top:50%;transition:transform var(--t) var(--ease)}
+.fq .pm::before{width:13px;height:1.4px;transform:translate(-50%,-50%)}
+.fq .pm::after{width:1.4px;height:13px;transform:translate(-50%,-50%)}
+.fq[open] .pm::after{transform:translate(-50%,-50%) rotate(90deg)}
+.fq .ans{padding:0 44px 24px 4px;font-size:14.5px;color:var(--tx-2);line-height:1.68}
 
 /* ── cta / footer ─────────────────────────────────────────────────────────── */
-#cta{background:var(--ink);color:var(--paper);text-align:center;overflow:hidden}
-#cta .lead{color:rgba(247,244,239,.65);margin:0 auto}
-#cta .eyebrow{color:var(--gold-bright)}
-footer{padding:52px 0;border-top:1px solid var(--ink-06);font-size:12.5px;color:var(--ink-25)}
-.foot-row{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+#cta{text-align:center;position:relative;overflow:hidden}
+#cta::before{content:'';position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);
+  width:min(760px,120vw);height:min(760px,120vw);border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,rgba(138,162,255,.11),transparent 62%)}
+#cta .wrap{position:relative}
+.cta-mark{width:44px;height:44px;color:var(--accent);margin:0 auto 28px;display:block}
+footer{border-top:1px solid var(--line);padding:52px 0 60px}
+.f-grid{display:flex;justify-content:space-between;gap:40px;flex-wrap:wrap}
+.f-links{display:flex;gap:52px;flex-wrap:wrap}
+.f-links ul{list-style:none;display:flex;flex-direction:column;gap:11px}
+.f-links h5{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--tx-3);margin-bottom:15px;font-weight:400}
+.f-links a{font-size:13.5px;color:var(--tx-2);text-decoration:none;transition:color var(--t-fast)}
+.f-links a:hover{color:var(--tx)}
+.f-bot{margin-top:44px;padding-top:24px;border-top:1px solid var(--line);
+  display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--tx-3)}
 
-/* ── reveal: visible by default, hidden only where motion is welcome ──────── */
+/* ── reveal — content is visible unless JS promises to reveal it ──────────── */
 .rv{opacity:1;transform:none}
-@media (prefers-reduced-motion: no-preference){
-  .rv{opacity:0;transform:translateY(24px);transition:opacity .85s var(--ease),transform .85s var(--ease)}
-  .rv.in{opacity:1;transform:none}
-}
-@media (prefers-reduced-motion: reduce){
-  .blob{animation:none}
-  .lineMask>span{transform:none}
-  html.anim .agent,html.anim .row{opacity:1;transform:none}
+html.motion .rv{opacity:0;transform:translateY(18px);
+  transition:opacity .62s var(--ease),transform .62s var(--ease)}
+html.motion .rv.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){
+  html.motion .rv{opacity:1!important;transform:none!important}
+  .pulse,#amb .lum,.think .bar::after,.core::after{animation:none!important}
+  html{scroll-behavior:auto}
 }
 
 /* ── waitlist ─────────────────────────────────────────────────────────────── */
-#wl{position:fixed;inset:0;background:rgba(20,18,15,.55);backdrop-filter:blur(6px);
-  display:none;align-items:center;justify-content:center;z-index:1000;padding:22px}
-#wl.on{display:flex;animation:fade .3s ease both}
-@keyframes fade{from{opacity:0}to{opacity:1}}
-.wl-card{background:#fff;border-radius:22px;padding:34px;max-width:430px;width:100%;
-  box-shadow:0 30px 80px rgba(20,18,15,.3);animation:cardIn .45s var(--ease) both}
-@keyframes cardIn{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:none}}
-.wl-in{width:100%;padding:14px 18px;border-radius:100px;border:1px solid var(--ink-12);
-  font-size:15px;font-family:inherit;outline:none;color:var(--ink)}
-.wl-in:focus{border-color:var(--ink)}
+#wl{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;
+  padding:20px;background:rgba(4,5,7,.72);backdrop-filter:blur(8px)}
+#wl.on{display:flex}
+.wl-c{width:100%;max-width:410px;padding:30px;border-radius:var(--r-xl);
+  background:var(--bg-1);border:1px solid var(--line-2);box-shadow:0 40px 90px rgba(0,0,0,.8)}
+.wl-in{width:100%;padding:12px 16px;border-radius:var(--r);background:rgba(0,0,0,.4);
+  border:1px solid var(--line);color:var(--tx);font-family:inherit;font-size:15px;outline:none}
+.wl-in:focus{border-color:var(--accent)}
 </style>
 </head>
 <body>
 
-<div id="bg"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
-<div id="grain"></div>
-<div id="prog"></div>
+<div id="amb" aria-hidden="true">
+  <div class="grid"></div><div class="lum l1"></div><div class="lum l2"></div>
+</div>
 
+<!-- Shared symbol definitions — one icon system, consistent 1.6 stroke -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-atlas" viewBox="0 0 32 32">
+    <g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6.6 25.4 L16 6.6 L25.4 25.4"/><path d="M11.1 19.6 H20.9" stroke-opacity=".5"/></g>
+    <circle cx="16" cy="19.6" r="2.5" fill="currentColor"/>
+  </symbol>
+  <g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <symbol id="i-memory" viewBox="0 0 24 24"><path d="M12 3a4 4 0 0 0-4 4 3 3 0 0 0-1 5.8V17a4 4 0 0 0 8 0v-2h1a3 3 0 0 0 0-6 4 4 0 0 0-4-6Z"/></symbol>
+    <symbol id="i-tasks" viewBox="0 0 24 24"><path d="M4 6.5 6 8.5 10 4.5M4 17.5l2 2 4-4M14 7h6M14 17h6"/></symbol>
+    <symbol id="i-research" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></symbol>
+    <symbol id="i-finance" viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-6M4 19h16"/></symbol>
+    <symbol id="i-jobs" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+    <symbol id="i-news" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h6M7 13h10M7 16h7"/></symbol>
+    <symbol id="i-writing" viewBox="0 0 24 24"><path d="M4 20h4l10-10a2.5 2.5 0 0 0-4-4L4 16v4Z"/><path d="M13.5 6.5l4 4"/></symbol>
+    <symbol id="i-coach" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-contacts" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></symbol>
+    <symbol id="i-invoice" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9.5 8h5M9.5 12h5"/></symbol>
+    <symbol id="i-email" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5 12 13l8.5-6.5"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+    <symbol id="i-whatsapp" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-13.3 7.9L3 21l1.2-4.5A9 9 0 1 1 21 12Z"/></symbol>
+    <symbol id="i-travel" viewBox="0 0 24 24"><path d="M21 15.5 3 10V6l3 1 2.5 2 5-1L11 3.5 13.5 3 21 10Z"/><path d="M4 20h16"/></symbol>
+    <symbol id="i-trading" viewBox="0 0 24 24"><path d="M3 17l5-6 4 3 4-6 5 4"/><path d="M3 21h18"/></symbol>
+    <symbol id="i-health" viewBox="0 0 24 24"><path d="M3 12h4l2-5 3 10 2.5-6 1.5 3h5"/></symbol>
+    <symbol id="i-shopping" viewBox="0 0 24 24"><path d="M4 7h16l-1.4 12H5.4L4 7Z"/><path d="M9 7a3 3 0 0 1 6 0"/></symbol>
+    <symbol id="i-legal" viewBox="0 0 24 24"><path d="M12 4v16M6 8l-3 6h6l-3-6ZM18 8l-3 6h6l-3-6ZM5 6h14"/></symbol>
+    <symbol id="i-social" viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5"/><circle cx="17" cy="6.5" r="2.5"/><circle cx="17" cy="17.5" r="2.5"/><path d="M8.3 10.9 14.7 7.7M8.3 13.1l6.4 3.2"/></symbol>
+    <symbol id="i-code" viewBox="0 0 24 24"><path d="M9 17 4 12l5-5M15 7l5 5-5 5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M4.5 12.5 9.5 17.5 19.5 7"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+    <symbol id="i-activity" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1M18.7 18.7l-2.1-2.1M7.4 7.4 5.3 5.3"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
+  </g>
+</defs></svg>
+
+<!-- ═══ NAV ═══════════════════════════════════════════════════════════════ -->
 <nav id="nav">
-  <a href="#hero" class="logo">ATLAS</a>
-  <ul class="nav-links">
-    <li><a href="#honesty">What's real</a></li>
-    <li><a href="#capture">How it works</a></li>
-    <li><a href="#jobs">Job search</a></li>
-    <li><a href="#pricing">Pricing</a></li>
-  </ul>
-  <a href="/atlas" class="btn btn-primary">Try Atlas</a>
+  <div class="navbar">
+    <a href="#top" class="nav-brand" aria-label="Atlas home">
+      <svg class="mark" aria-hidden="true"><use href="#i-atlas"/></svg>
+      <span class="wordmark">ATLAS</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#system">System</a></li>
+      <li><a href="#agents">Agents</a></li>
+      <li><a href="#work">Work</a></li>
+      <li><a href="#jobs">Jobs</a></li>
+      <li><a href="#pricing">Pricing</a></li>
+    </ul>
+    <a href="/atlas" class="btn btn-1">Open Atlas</a>
+  </div>
 </nav>
 
-<!-- ═══ HERO ═══════════════════════════════════════════════════════════════ -->
+<main id="top">
+
+<!-- ═══ HERO ══════════════════════════════════════════════════════════════ -->
 <section id="hero">
   <div class="wrap hero-grid">
     <div>
-      <div class="eyebrow rv">Private beta · Limited access</div>
-      <h1 class="rv" id="h1">
-        <span class="lineMask"><span>Your personal AI.</span></span>
-        <span class="lineMask"><span><em>Always working.</em></span></span>
-      </h1>
-      <p class="lead hero-sub rv">
-        Atlas handles your email, tasks, invoices, expenses and job applications —
-        and tells you plainly when it can't do something, instead of pretending it did.
+      <div class="kicker rv">Personal AI system</div>
+      <h1 class="rv">Tell Atlas<br>what matters.<br><span class="h1-sub">It handles the rest.</span></h1>
+      <p class="lead rv" style="margin-top:26px">
+        Not a chat box that waits for the next prompt. Atlas holds your context,
+        coordinates twelve specialised agents, and asks before it acts on anything
+        that matters.
       </p>
-      <div class="hero-actions rv">
-        <a href="/atlas" class="btn btn-primary">
-          Try Atlas free
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      <div class="hero-cta rv">
+        <a href="/atlas" class="btn btn-1 btn-lg">Open Atlas</a>
+        <a href="#system" class="btn btn-2 btn-lg">
+          See how it works <svg width="14" height="14" aria-hidden="true"><use href="#i-down"/></svg>
         </a>
-        <button class="btn btn-ghost" onclick="openWL()">Join the waitlist</button>
       </div>
-      <p class="hero-note rv">No credit card · 5 free messages a day</p>
+      <div class="hero-meta rv">
+        <span><i class="st st-live pulse"></i><b id="mLive">12</b>&nbsp;agents live</span>
+        <span><i class="st st-off"></i><b id="mPlan">8</b>&nbsp;planned</span>
+        <span>Free tier — 5 messages a day</span>
+      </div>
     </div>
 
-    <!-- the chat runs a real loop of exchanges rather than sitting still -->
-    <div class="panel rv tilt" id="chatPanel">
-      <div class="panel-bar">
-        <div class="atlas-mark pulse">A</div>
-        <span class="panel-title">Atlas</span>
-        <span style="margin-left:auto;font-size:11px;color:var(--green);display:flex;align-items:center;gap:6px">
-          <span class="swatch" style="background:var(--green)"></span><span id="navCount">10 agents connected</span>
-        </span>
+    <!-- Live orchestration. Real DOM, scripted sequence, labelled as illustrative. -->
+    <div class="panel orch rv">
+      <div class="panel-hd">
+        <svg class="mark" style="width:17px;height:17px" aria-hidden="true"><use href="#i-atlas"/></svg>
+        <span class="panel-t">Atlas · orchestration</span>
+        <span class="tag tag-live" style="margin-left:auto"><i class="st st-live pulse"></i>Online</span>
       </div>
-      <div class="chat" id="chat"></div>
+      <div class="orch-body" id="orch"></div>
+        <div class="rail" id="rail" aria-hidden="true"></div>
     </div>
   </div>
 </section>
 
-<!-- ═══ HONESTY ════════════════════════════════════════════════════════════ -->
-<section id="honesty" style="background:var(--paper-2)">
+<!-- ═══ NOT A CHATBOT ═════════════════════════════════════════════════════ -->
+<section class="sec" id="system">
   <div class="wrap">
-    <div style="max-width:680px">
-      <div class="eyebrow rv">What's actually connected</div>
-      <h2 class="rv">Ten agents work today.<br><em>Ten don't. We say which.</em></h2>
-      <p class="lead rv" style="margin-top:22px">
-        Every other assistant answers "done!" and hopes you don't check. Atlas shows you
-        its wiring. This panel is pulled live from the running product — not a graphic.
-      </p>
+    <div class="sec-head rv">
+      <div class="kicker">The difference</div>
+      <h2>A chat box is not<br>an assistant.</h2>
+      <p class="lead">Most AI tools answer, then forget. Atlas keeps the thread — it
+        understands the goal, decides which capability handles it, does the work, and
+        comes back to you only when your decision is actually needed.</p>
     </div>
-    <div class="agents" id="agentGrid"></div>
-    <div class="legend rv">
-      <span><i class="swatch" style="background:var(--green)"></i> Connected and doing real work</span>
-      <span><i class="swatch" style="background:var(--ink-12)"></i> Not built yet — Atlas will say so</span>
+
+    <div class="vs rv">
+      <div class="vs-col">
+        <div class="vs-h">Typical AI chat</div>
+        <div class="flow">
+          <div class="flow-i"><span class="n">01</span>You write a prompt</div>
+          <div class="flow-l"></div>
+          <div class="flow-i"><span class="n">02</span>It returns text</div>
+          <div class="flow-l"></div>
+          <div class="flow-i"><span class="n">03</span>You do the actual work</div>
+          <div class="flow-l"></div>
+          <div class="flow-i"><span class="n">04</span>It forgets by tomorrow</div>
+        </div>
+        <div class="vs-end">You are still the one holding everything together.</div>
+      </div>
+      <div class="vs-col on">
+        <div class="vs-h">Atlas</div>
+        <div class="flow">
+          <div class="flow-i"><span class="n">01</span>You state an objective</div>
+          <div class="flow-l"></div>
+          <div class="flow-i"><span class="n">02</span>Atlas reads it against your context</div>
+          <div class="flow-l"></div>
+          <div class="flow-i"><span class="n">03</span>It routes to the right agents</div>
+          <div class="flow-l"></div>
+          <div class="flow-i"><span class="n">04</span>Work is done and recorded</div>
+          <div class="flow-l"></div>
+          <div class="flow-i"><span class="n">05</span>It asks you to approve what matters</div>
+          <div class="flow-l"></div>
+          <div class="flow-i"><span class="n">06</span>It remembers for next time</div>
+        </div>
+        <div class="vs-end" style="color:var(--tx-2)">You set direction. Atlas carries the load.</div>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- ═══ CAPTURE ════════════════════════════════════════════════════════════ -->
-<section id="capture">
+<!-- ═══ AGENT NETWORK ═════════════════════════════════════════════════════ -->
+<section class="sec" id="agents">
+  <div class="wrap">
+    <div class="sec-head net-head rv">
+      <div class="kicker">The system</div>
+      <h2>One intelligence.<br>Twelve specialists.</h2>
+      <p class="lead">Each agent owns one part of your life. Atlas decides which ones a
+        request needs and coordinates between them. Hover any node — this map is drawn
+        live from the running system, so what you see is what actually exists.</p>
+    </div>
+
+    <div class="net-wrap rv">
+      <div class="net" id="net">
+        <svg class="wires" id="wires" aria-hidden="true"></svg>
+        <div class="core">
+          <svg class="mark" aria-hidden="true"><use href="#i-atlas"/></svg>
+          <b>ATLAS</b><i id="coreCount">12 live</i>
+        </div>
+      </div>
+      <aside class="net-info" id="netInfo" aria-live="polite"></aside>
+      <div class="net-list" id="netList"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ REAL WORK ═════════════════════════════════════════════════════════ -->
+<section class="sec" id="work">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div class="kicker">Real work</div>
+      <h2>Say it once.</h2>
+      <p class="lead">These are the capabilities that exist today, doing the things they
+        actually do. Nothing here is aspirational.</p>
+    </div>
+
+    <div class="wf-grid rv">
+      <article class="wf">
+        <div class="wf-hd"><svg style="width:15px;height:15px;color:var(--tx-2)" aria-hidden="true"><use href="#i-tasks"/></svg>
+          <h4>Tasks</h4><span class="tag tag-live"><i class="st st-live"></i>Live</span></div>
+        <div class="wf-say"><span class="q">You say</span>“I've got three deadlines this week.”</div>
+        <div class="wf-steps">
+          <div class="wf-s">Extracts each deadline from the sentence<i class="st st-live"></i></div>
+          <div class="wf-s">Assigns priority and due dates<i class="st st-live"></i></div>
+          <div class="wf-s">Writes them to your task list<i class="st st-live"></i></div>
+        </div>
+        <div class="wf-out"><i class="st st-live"></i>3 tasks created — no form, no tagging</div>
+      </article>
+
+      <article class="wf">
+        <div class="wf-hd"><svg style="width:15px;height:15px;color:var(--tx-2)" aria-hidden="true"><use href="#i-finance"/></svg>
+          <h4>Finance</h4><span class="tag tag-live"><i class="st st-live"></i>Live</span></div>
+        <div class="wf-say"><span class="q">You say</span>“Spent £120 on software this morning.”</div>
+        <div class="wf-steps">
+          <div class="wf-s">Reads the amount and category<i class="st st-live"></i></div>
+          <div class="wf-s">Records it against today<i class="st st-live"></i></div>
+          <div class="wf-s">Updates your 30-day position<i class="st st-live"></i></div>
+        </div>
+        <div class="wf-out"><i class="st st-live"></i>Logged as an expense — money owed is never counted as income</div>
+      </article>
+
+      <article class="wf">
+        <div class="wf-hd"><svg style="width:15px;height:15px;color:var(--tx-2)" aria-hidden="true"><use href="#i-contacts"/></svg>
+          <h4>Contacts</h4><span class="tag tag-live"><i class="st st-live"></i>Live</span></div>
+        <div class="wf-say"><span class="q">You say</span>“Sarah at Creative Agency is a new client.”</div>
+        <div class="wf-steps">
+          <div class="wf-s">Recognises the person and company<i class="st st-live"></i></div>
+          <div class="wf-s">Stores the relationship<i class="st st-live"></i></div>
+          <div class="wf-s">Links her to future mentions<i class="st st-live"></i></div>
+        </div>
+        <div class="wf-out"><i class="st st-live"></i>Saved while you were still talking</div>
+      </article>
+
+      <article class="wf">
+        <div class="wf-hd"><svg style="width:15px;height:15px;color:var(--tx-2)" aria-hidden="true"><use href="#i-invoice"/></svg>
+          <h4>Invoicing</h4><span class="tag tag-wait"><i class="st st-wait"></i>Needs approval</span></div>
+        <div class="wf-say"><span class="q">You say</span>“Invoice her £2,500 for the logo project.”</div>
+        <div class="wf-steps">
+          <div class="wf-s">Parses client, amount and terms<i class="st st-live"></i></div>
+          <div class="wf-s">Drafts the invoice and covering note<i class="st st-live"></i></div>
+          <div class="wf-s">Holds — money needs a human<i class="st st-wait"></i></div>
+        </div>
+        <div class="wf-out" style="background:rgba(245,165,36,.05)"><i class="st st-wait"></i>Waiting for you to confirm before anything is raised</div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ MEMORY ════════════════════════════════════════════════════════════ -->
+<section class="sec">
   <div class="wrap split">
-    <div class="copy">
-      <div class="eyebrow rv">One sentence in</div>
-      <h2 class="rv">You talk.<br><em>It files itself.</em></h2>
-      <p class="lead rv" style="margin-top:22px">
-        No forms, no categories, no tagging. Mention a spend, a person or a deadline in
-        passing and it lands in the right place before Atlas has finished replying.
-      </p>
+    <div class="copy rv">
+      <div class="kicker">Memory</div>
+      <h2>It shouldn't need telling twice.</h2>
+      <p class="lead" style="margin-top:20px">Atlas keeps durable facts — who your clients
+        are, what you're working towards, how you like things done — and pulls the
+        relevant ones into every conversation.</p>
+      <p class="lead" style="margin-top:14px;font-size:15px">Everything it stores is visible
+        and deletable from Settings. Nothing is hidden from you.</p>
     </div>
-    <div class="panel rv tilt par" data-par="18">
-      <div class="panel-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="panel-title">Dashboard</span></div>
-      <div class="dash" id="dash">
-        <div class="cell">
-          <div class="cell-l">Expenses</div>
-          <div class="row"><span>Waitrose</span><span class="new-flag">new</span><span class="amt" style="margin-left:12px">£85</span></div>
-          <div class="row"><span>Pret</span><span class="amt">£12</span></div>
-          <div class="row"><span>Taxi</span><span class="amt">£19</span></div>
-        </div>
-        <div class="cell">
-          <div class="cell-l">Contacts</div>
-          <div class="row"><div><div>Sarah Whitfield</div><div class="sub">Creative Agency · client</div></div><span class="new-flag">new</span></div>
-          <div class="row"><div><div>Marcus Bell</div><div class="sub">Northgate Studios</div></div></div>
-        </div>
-        <div class="cell">
-          <div class="cell-l">Tasks</div>
-          <div class="row"><span class="tick"></span><span>Invoice Sarah — logo project</span><span class="new-flag">new</span></div>
-          <div class="row"><span class="tick"></span><span>Prep Thursday interview</span></div>
-        </div>
-        <div class="cell">
-          <div class="cell-l">Invoices</div>
-          <div class="row"><span>Creative Agency</span><span class="amt">£2,500</span></div>
-          <div class="row"><span class="sub">Draft — awaiting your approval</span></div>
-        </div>
+    <div class="panel rv">
+      <div class="panel-hd"><svg style="width:15px;height:15px;color:var(--tx-2)" aria-hidden="true"><use href="#i-memory"/></svg>
+        <span class="panel-t">What Atlas knows</span></div>
+      <div>
+        <div class="mem-row"><span class="k">Identity</span>AI graduate, based in London</div>
+        <div class="mem-row"><span class="k">Goal</span>Applications aren't landing interviews</div>
+        <div class="mem-row"><span class="k">Priority</span>Job search, finance, research</div>
+        <div class="mem-row"><span class="k">Person</span>Sarah — Creative Agency, client</div>
+        <div class="mem-row"><span class="k">Preference</span>Brief replies, no preamble</div>
+      </div>
+      <div style="padding:15px 16px;border-top:1px solid var(--line);background:rgba(0,0,0,.2);
+                  font-size:13px;color:var(--tx-2);display:flex;gap:10px;align-items:flex-start">
+        <svg style="width:14px;height:14px;color:var(--accent);flex-shrink:0;margin-top:3px" aria-hidden="true"><use href="#i-atlas"/></svg>
+        <span>Because it knows Sarah is a client, “invoice her” needs no explanation.</span>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ═══ JOBS ═══════════════════════════════════════════════════════════════ -->
-<section id="jobs" style="background:var(--paper-2)">
-  <div class="wrap split flip">
-    <div class="panel rv tilt par" data-par="-18">
-      <div class="panel-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="panel-title">Application package</span></div>
-      <div class="jobs-grid">
-        <div class="score">
-          <div class="score-n"><span class="count" data-to="82">0</span><span style="font-size:24px">%</span></div>
-          <div class="score-l">Apply</div>
+<!-- ═══ APPROVALS ═════════════════════════════════════════════════════════ -->
+<section class="sec">
+  <div class="wrap split rev">
+    <div class="panel rv">
+      <div class="panel-hd"><svg style="width:15px;height:15px;color:var(--wait)" aria-hidden="true"><use href="#i-lock"/></svg>
+        <span class="panel-t">Approval required</span>
+        <span class="tag tag-wait" style="margin-left:auto">Held</span></div>
+      <div class="panel-bd" style="display:flex;flex-direction:column;gap:13px">
+        <div style="font-size:13px;color:var(--tx-3)">Atlas has prepared this. It will not send it.</div>
+        <div style="border:1px solid var(--line);border-radius:var(--r);overflow:hidden">
+          <div style="padding:11px 14px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--tx-3)">
+            To&nbsp; <span style="color:var(--tx)">sarah@creativeagency.co</span></div>
+          <div style="padding:11px 14px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--tx-3)">
+            Subject&nbsp; <span style="color:var(--tx)">Invoice — logo project</span></div>
+          <div style="padding:13px 14px;font-size:13px;color:var(--tx-2);line-height:1.6">
+            Hi Sarah, please find attached the invoice for the logo project, £2,500,
+            due 30 days from today. Thanks for a great project.</div>
         </div>
-        <div class="gaps">
-          <div>
-            <h4 style="color:var(--green)">Strengths</h4>
-            <ul>
-              <li><span style="color:var(--green)">+</span> Production LLM systems</li>
-              <li><span style="color:var(--green)">+</span> Full-stack, ships alone</li>
-              <li><span style="color:var(--green)">+</span> London-based</li>
-            </ul>
-          </div>
-          <div>
-            <h4 style="color:#a33">Gaps</h4>
-            <ul>
-              <li><span style="color:#a33">−</span> No formal MLOps</li>
-              <li><span style="color:#a33">−</span> Kubernetes not evidenced</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-      <div class="docs">
-        <div class="doc">
-          <div class="cell-l">Tailored CV</div>
-          <pre>PERSONAL STATEMENT
-AI graduate who ships production systems end
-to end. Built and deployed an autonomous
-multi-agent assistant handling email, finance
-and job automation for real users.</pre>
-        </div>
-        <div class="doc">
-          <div class="cell-l">Cover letter</div>
-          <pre>I've spent the last year building the thing
-your job description describes — an agent
-system that has to be right about money and
-honest when it isn't sure.</pre>
+        <div style="display:flex;gap:8px">
+          <button class="mini mini-y" type="button">Approve &amp; send</button>
+          <button class="mini" type="button">Edit</button>
+          <button class="mini" type="button">Discard</button>
         </div>
       </div>
     </div>
-    <div class="copy">
-      <div class="eyebrow rv">Job search</div>
-      <h2 class="rv">A tailored CV<br><em>per application.</em></h2>
-      <p class="lead rv" style="margin-top:22px">
-        Paste a job description. Atlas rewrites your CV against it, drafts the cover letter,
-        and scores your honest fit — including the gaps, so you know what you're walking into.
-      </p>
-      <p class="rv" style="margin-top:16px;font-size:15px;color:var(--ink-45)">
-        It never submits anything on your behalf. Every draft waits for you.
-      </p>
+    <div class="copy rv">
+      <div class="kicker">Control</div>
+      <h2>Autonomous where it can be. Asking where it should.</h2>
+      <p class="lead" style="margin-top:20px">Atlas writes tasks, contacts and expenses on
+        its own — small, reversible things. Anything that leaves your account or costs
+        money stops and waits for you.</p>
+      <div style="display:flex;flex-direction:column;gap:11px;margin-top:26px">
+        <div style="display:flex;align-items:center;gap:11px;font-size:14px"><i class="st st-live"></i>Record a task, contact or expense<span class="tag tag-live" style="margin-left:auto">Automatic</span></div>
+        <div style="display:flex;align-items:center;gap:11px;font-size:14px"><i class="st st-wait"></i>Send an email<span class="tag tag-wait" style="margin-left:auto">Your call</span></div>
+        <div style="display:flex;align-items:center;gap:11px;font-size:14px"><i class="st st-wait"></i>Raise an invoice<span class="tag tag-wait" style="margin-left:auto">Your call</span></div>
+        <div style="display:flex;align-items:center;gap:11px;font-size:14px"><i class="st st-wait"></i>Create a calendar event<span class="tag tag-wait" style="margin-left:auto">Your call</span></div>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- ═══ STATS ══════════════════════════════════════════════════════════════ -->
-<section id="stats">
-  <div class="wrap stats-grid">
-    <div class="rv"><div class="stat-n"><span class="count" data-to="10" id="statAgents">0</span></div><div class="stat-l">Agents working</div></div>
-    <div class="rv"><div class="stat-n"><span class="count" data-to="4">0</span>h</div><div class="stat-l">Saved daily</div></div>
-    <div class="rv"><div class="stat-n">£<span class="count" data-to="299">0</span></div><div class="stat-l">From, per month</div></div>
-    <div class="rv"><div class="stat-n">24/7</div><div class="stat-l">Always on</div></div>
-  </div>
-</section>
-
-<!-- ═══ PRICING ════════════════════════════════════════════════════════════ -->
-<section id="pricing">
-  <div class="wrap" style="text-align:center">
-    <div class="eyebrow rv">Pricing</div>
-    <h2 class="rv">Less than an assistant.<br><em>More than a tool.</em></h2>
-  </div>
-  <div class="wrap price-grid">
-    <div class="price-card rv">
-      <div class="price-name">Pro</div>
-      <div class="price-amt">£299</div>
-      <div class="price-per">per month</div>
-      <ul class="price-feats">
-        <li><i>✓</i> Unlimited messages</li>
-        <li><i>✓</i> All ten connected agents</li>
-        <li><i>✓</i> Email &amp; calendar once linked</li>
-        <li><i>✓</i> Job applications &amp; CV tailoring</li>
-        <li><i>✓</i> Daily morning briefing</li>
-      </ul>
-      <button class="btn btn-ghost price-btn" onclick="openWL()">Get started</button>
-    </div>
-    <div class="price-card pop rv">
-      <div class="pop-badge">MOST POPULAR</div>
-      <div class="price-name">Elite</div>
-      <div class="price-amt">£499</div>
-      <div class="price-per">per month</div>
-      <ul class="price-feats">
-        <li><i>✓</i> Everything in Pro</li>
-        <li><i>✓</i> Priority response</li>
-        <li><i>✓</i> Finance &amp; invoice automation</li>
-        <li><i>✓</i> Early access to new agents</li>
-        <li><i>✓</i> Direct line to the founder</li>
-      </ul>
-      <button class="btn btn-primary price-btn" style="background:var(--gold-bright);color:#14120f" onclick="openWL()">Get started</button>
-    </div>
-  </div>
-</section>
-
-<!-- ═══ CTA ════════════════════════════════════════════════════════════════ -->
-<section id="cta">
+<!-- ═══ JOBS ══════════════════════════════════════════════════════════════ -->
+<section class="sec" id="jobs">
   <div class="wrap">
-    <div class="eyebrow rv">Good morning</div>
-    <h2 class="rv" style="margin-bottom:22px">Your day is already<br><em>taken care of.</em></h2>
-    <p class="lead rv" style="text-align:center">Join the waitlist and be first when the next agents land.</p>
-    <div class="rv" style="margin-top:34px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-      <button class="btn" style="background:var(--gold-bright);color:#14120f" onclick="openWL()">Join the waitlist</button>
-      <a href="/atlas" class="btn btn-ghost" style="border-color:rgba(247,244,239,.28);color:rgba(247,244,239,.85)">Try it now</a>
+    <div class="sec-head rv">
+      <div class="kicker">Job search</div>
+      <h2>Stop rewriting your CV<br>from scratch.</h2>
+      <p class="lead">Paste a job description. Atlas rewrites your CV against it, drafts the
+        cover letter and scores the fit honestly — gaps included.</p>
+    </div>
+    <div class="panel rv">
+      <div class="panel-hd"><svg style="width:15px;height:15px;color:var(--tx-2)" aria-hidden="true"><use href="#i-jobs"/></svg>
+        <span class="panel-t">Application workspace</span>
+        <span class="tag" style="margin-left:auto">Prepared — not submitted</span></div>
+      <div class="job">
+        <div>
+          <h3 style="font-size:19px">AI Engineer</h3>
+          <div style="font-size:13.5px;color:var(--tx-3);margin-top:5px">Anthropic · London · Hybrid</div>
+        </div>
+        <div class="score"><b>82<span style="font-size:19px">%</span></b><span>Fit</span></div>
+      </div>
+      <div style="padding:18px 20px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr;gap:22px">
+        <div>
+          <div style="font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--live);margin-bottom:9px">Strengths</div>
+          <div style="font-size:13px;color:var(--tx-2);line-height:1.9">Production LLM systems<br>Ships end to end alone<br>London-based</div>
+        </div>
+        <div>
+          <div style="font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--wait);margin-bottom:9px">Gaps</div>
+          <div style="font-size:13px;color:var(--tx-2);line-height:1.9">No formal MLOps<br>Kubernetes not evidenced</div>
+        </div>
+      </div>
+      <div class="job-docs">
+        <div class="job-doc">
+          <div class="h"><i class="st st-live"></i>Tailored CV</div>
+          <p>AI graduate who ships production systems end to end. Built and deployed an
+             autonomous multi-agent assistant handling tasks, finance and job automation.</p>
+        </div>
+        <div class="job-doc">
+          <div class="h"><i class="st st-live"></i>Cover letter</div>
+          <p>I've spent the last year building the thing your job description describes —
+             an agent system that has to be right about money and honest when it isn't sure.</p>
+        </div>
+      </div>
+      <div style="padding:14px 20px;border-top:1px solid var(--line);font-size:13px;color:var(--tx-3);
+                  display:flex;align-items:center;gap:10px;background:rgba(0,0,0,.2)">
+        <i class="st st-wait"></i>Atlas prepares applications. It never submits one for you.
+      </div>
     </div>
   </div>
 </section>
+
+<!-- ═══ HONESTY ═══════════════════════════════════════════════════════════ -->
+<section class="sec">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div class="kicker">What's real</div>
+      <h2>No fake demos.<br>No fake autonomy.</h2>
+      <p class="lead">Every other assistant says “done!” and hopes you don't check. This
+        board is generated from the running system. When something isn't built, Atlas
+        says so — in the product and here.</p>
+    </div>
+    <div class="board rv">
+      <div class="board-col on">
+        <div class="board-h"><i class="st st-live"></i>Live now<b id="bLive">12</b></div>
+        <div class="chips" id="chipsLive"></div>
+      </div>
+      <div class="board-col">
+        <div class="board-h"><i class="st st-off"></i>Not built yet<b id="bPlan">8</b></div>
+        <div class="chips" id="chipsPlan"></div>
+      </div>
+    </div>
+    <p class="rv" style="margin-top:26px;font-size:14px;color:var(--tx-3);max-width:64ch">
+      Email and Calendar depend on a Google connection — until you link one, Atlas reports
+      them as unavailable rather than pretending.
+    </p>
+  </div>
+</section>
+
+<!-- ═══ COMMAND CENTRE ════════════════════════════════════════════════════ -->
+<section class="sec">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div class="kicker">The product</div>
+      <h2>Your morning, already sorted.</h2>
+    </div>
+    <div class="cc rv">
+      <div class="cc-bar">
+        <span class="cc-dot"></span><span class="cc-dot"></span><span class="cc-dot"></span>
+        <span class="cc-url">atlas — dashboard</span>
+      </div>
+      <div class="cc-body">
+        <aside class="cc-side">
+          <div class="cc-nav on"><svg aria-hidden="true"><use href="#i-grid"/></svg>Overview</div>
+          <div class="cc-nav"><svg aria-hidden="true"><use href="#i-atlas"/></svg>Chat</div>
+          <div class="cc-nav"><svg aria-hidden="true"><use href="#i-jobs"/></svg>Jobs</div>
+          <div class="cc-nav"><svg aria-hidden="true"><use href="#i-activity"/></svg>Activity</div>
+          <div class="cc-nav"><svg aria-hidden="true"><use href="#i-memory"/></svg>Memory</div>
+          <div class="cc-nav"><svg aria-hidden="true"><use href="#i-settings"/></svg>Settings</div>
+        </aside>
+        <div class="cc-main">
+          <h3 style="font-size:23px">Good morning, Ouail.</h3>
+          <p style="font-size:14px;color:var(--tx-2);margin-top:7px">
+            Two invoices need chasing and Thursday's interview prep is still open.</p>
+          <div class="cc-stat">
+            <div><b class="count" data-to="7">0</b><span>Tasks open</span></div>
+            <div><b class="count" data-to="2">0</b><span>Need you</span></div>
+            <div><b>£<span class="count" data-to="4500">0</span></b><span>Unpaid</span></div>
+          </div>
+          <div style="font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;
+                      color:var(--tx-3);margin-bottom:6px">Today</div>
+          <div class="feed">
+            <div class="feed-i"><time>09:02</time><div><div>Context retrieved for the day</div><div class="ag">Memory</div></div><i class="st st-live" style="margin-left:auto"></i></div>
+            <div class="feed-i"><time>09:14</time><div><div>3 priorities organised</div><div class="ag">Tasks</div></div><i class="st st-live" style="margin-left:auto"></i></div>
+            <div class="feed-i"><time>10:31</time><div><div>Competitor summary written</div><div class="ag">Research</div></div><i class="st st-live" style="margin-left:auto"></i></div>
+            <div class="feed-i"><time>11:04</time><div><div>Expense categorised</div><div class="ag">Finance</div></div><i class="st st-live" style="margin-left:auto"></i></div>
+            <div class="feed-i"><time>12:18</time><div><div>Invoice drafted — awaiting approval</div><div class="ag">Invoice</div></div><i class="st st-wait" style="margin-left:auto"></i></div>
+          </div>
+          <div class="demo-note">Illustrative interface</div>
+        </div>
+        <aside class="cc-ctx">
+          <div style="font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;
+                      color:var(--tx-3);margin-bottom:13px">Needs you</div>
+          <div style="padding:14px;border-radius:var(--r);border:1px solid rgba(245,165,36,.26);
+                      background:rgba(245,165,36,.05);margin-bottom:10px">
+            <div style="font-size:13px;margin-bottom:5px">Invoice — Creative Agency</div>
+            <div style="font-size:12px;color:var(--tx-3);margin-bottom:11px">£2,500 · logo project</div>
+            <button class="mini mini-y" type="button">Review</button>
+          </div>
+          <div style="padding:14px;border-radius:var(--r);border:1px solid var(--line);background:var(--surf-2)">
+            <div style="font-size:13px;margin-bottom:5px">Chase overdue payment</div>
+            <div style="font-size:12px;color:var(--tx-3)">Draft ready · 4 days late</div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ PRICING ═══════════════════════════════════════════════════════════ -->
+<section class="sec" id="pricing">
+  <div class="wrap">
+    <div class="sec-head rv" style="text-align:center;margin-left:auto;margin-right:auto">
+      <div class="kicker" style="justify-content:center">Pricing</div>
+      <h2>Priced like an assistant,<br>not an app.</h2>
+    </div>
+    <div class="price rv">
+      <div class="pc">
+        <div class="pc-n">Pro</div>
+        <div class="pc-p">£299<span> / month</span></div>
+        <div class="pc-d">For people who want Atlas working alongside them every day.</div>
+        <ul class="pc-f">
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg>Unlimited messages</li>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg>All twelve live agents</li>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg>Gmail &amp; Calendar once connected</li>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg>CV tailoring and application packages</li>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg>Daily morning briefing</li>
+        </ul>
+        <a href="/atlas" class="btn btn-2" style="width:100%">Start with Pro</a>
+      </div>
+      <div class="pc on">
+        <div class="pc-badge">Recommended</div>
+        <div class="pc-n">Elite</div>
+        <div class="pc-p">£499<span> / month</span></div>
+        <div class="pc-d">For people who want Atlas running deeper across their work.</div>
+        <ul class="pc-f">
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg>Everything in Pro</li>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg>Priority responses — longer, deeper answers</li>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg>Finance and invoice automation</li>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg>Early access to new agents</li>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg>Direct line to the founder</li>
+        </ul>
+        <a href="/atlas" class="btn btn-1" style="width:100%">Start with Elite</a>
+      </div>
+    </div>
+    <p class="rv" style="text-align:center;margin-top:24px;font-size:13.5px;color:var(--tx-3)">
+      There's a free tier — five messages a day, no card.
+      <a href="/atlas" style="color:var(--tx-2)">Try it first</a>.
+    </p>
+  </div>
+</section>
+
+<!-- ═══ FAQ ═══════════════════════════════════════════════════════════════ -->
+<section class="sec-sm sec">
+  <div class="wrap">
+    <div class="sec-head rv" style="text-align:center;margin-left:auto;margin-right:auto">
+      <h2 style="font-size:clamp(26px,3.4vw,40px)">Questions</h2>
+    </div>
+    <div class="faq rv">
+      <details class="fq"><summary style="list-style:none"><button type="button">What is Atlas, exactly?<span class="pm"></span></button></summary>
+        <div class="ans">A personal AI system. You talk to it in one place, and it coordinates twelve
+        specialised capabilities — memory, tasks, research, finance, jobs, writing, contacts, invoicing
+        and more — rather than making you switch tools.</div></details>
+      <details class="fq"><summary style="list-style:none"><button type="button">Does it actually do things, or just talk?<span class="pm"></span></button></summary>
+        <div class="ans">It writes to your account. Mention a spend, a person or a deadline and it records
+        them while replying — no forms. Actions that leave your account, like sending an email or raising
+        an invoice, are prepared and held for your approval.</div></details>
+      <details class="fq"><summary style="list-style:none"><button type="button">Which agents are actually live?<span class="pm"></span></button></summary>
+        <div class="ans">Memory, tasks, research, finance, jobs, news, writing, coach, contacts and invoicing
+        work today. Email and calendar work once you connect a Google account. WhatsApp, travel, trading,
+        health, shopping, legal, social and code are not built — and Atlas will tell you so if you ask.</div></details>
+      <details class="fq"><summary style="list-style:none"><button type="button">What happens when it can't do something?<span class="pm"></span></button></summary>
+        <div class="ans">It says so. Ask Atlas to book a flight and it will tell you travel isn't connected,
+        then offer to help plan instead. It is built not to claim work it hasn't done — there's a check in
+        the code specifically to stop that.</div></details>
+      <details class="fq"><summary style="list-style:none"><button type="button">What does it remember?<span class="pm"></span></button></summary>
+        <div class="ans">Durable facts you tell it — your role, priorities, clients, preferences — plus your
+        conversation history. All of it is visible in Settings and you can delete any of it, or all of it,
+        whenever you like.</div></details>
+      <details class="fq"><summary style="list-style:none"><button type="button">How does the Gmail and Calendar connection work?<span class="pm"></span></button></summary>
+        <div class="ans">You connect your own Google account from Settings. Atlas can then read your inbox
+        and draft replies, and read your calendar and prepare events. Sending and creating always require
+        your explicit approval — it can never send on your behalf silently.</div></details>
+      <details class="fq"><summary style="list-style:none"><button type="button">Can I cancel?<span class="pm"></span></button></summary>
+        <div class="ans">Yes, any time. Billing runs through Stripe and there's no minimum term. The free
+        tier stays available if you want to keep an account without a subscription.</div></details>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CTA ═══════════════════════════════════════════════════════════════ -->
+<section class="sec" id="cta">
+  <div class="wrap">
+    <svg class="cta-mark rv" aria-hidden="true"><use href="#i-atlas"/></svg>
+    <h2 class="rv">You shouldn't have to<br>manage your own AI.</h2>
+    <p class="lead rv" style="margin:22px auto 0;text-align:center">
+      Give Atlas the objective. It will tell you what it did, what it's holding,
+      and what it can't do yet.</p>
+    <div class="rv" style="display:flex;gap:11px;justify-content:center;flex-wrap:wrap;margin-top:34px">
+      <a href="/atlas" class="btn btn-1 btn-lg">Open Atlas</a>
+      <button class="btn btn-2 btn-lg" type="button" onclick="openWL()">Join the waitlist</button>
+    </div>
+  </div>
+</section>
+
+</main>
 
 <footer>
-  <div class="wrap foot-row">
-    <span>© 2026 Atlas · Built by Ouail Abed</span>
-    <span>London, UK</span>
+  <div class="wrap">
+    <div class="f-grid">
+      <div style="max-width:250px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:13px">
+          <svg class="mark" aria-hidden="true"><use href="#i-atlas"/></svg>
+          <span class="wordmark">ATLAS</span>
+        </div>
+        <p style="font-size:13.5px;color:var(--tx-3);line-height:1.6">
+          A personal AI system. Twelve specialists, one coordinating intelligence.</p>
+      </div>
+      <div class="f-links">
+        <div><h5>Product</h5><ul>
+          <li><a href="#system">System</a></li><li><a href="#agents">Agents</a></li>
+          <li><a href="#work">Work</a></li><li><a href="#jobs">Jobs</a></li></ul></div>
+        <div><h5>Start</h5><ul>
+          <li><a href="/atlas">Open Atlas</a></li><li><a href="/login">Sign in</a></li>
+          <li><a href="#pricing">Pricing</a></li></ul></div>
+      </div>
+    </div>
+    <div class="f-bot">
+      <span>© 2026 Atlas · Built by Ouail Abed · London</span>
+      <span>Atlas never takes credit for work it didn't do.</span>
+    </div>
   </div>
 </footer>
 
 <div id="wl" onclick="if(event.target===this)closeWL()">
-  <div class="wl-card">
-    <h3 style="margin-bottom:8px">Join the waitlist</h3>
-    <p style="font-size:14px;color:var(--ink-45);margin-bottom:22px">We'll email you when spots open.</p>
-    <input id="wlEmail" class="wl-in" type="email" placeholder="your@email.com" autocomplete="email">
-    <p id="wlMsg" style="min-height:20px;font-size:13px;margin-top:11px;color:var(--gold)"></p>
-    <div style="display:flex;gap:10px;margin-top:12px">
-      <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeWL()">Cancel</button>
-      <button class="btn btn-primary" style="flex:2;justify-content:center" id="wlGo">Join</button>
+  <div class="wl-c" role="dialog" aria-modal="true" aria-label="Join the waitlist">
+    <h3 style="font-size:21px;margin-bottom:7px">Join the waitlist</h3>
+    <p style="font-size:13.5px;color:var(--tx-3);margin-bottom:20px">We'll email you when spots open.</p>
+    <input id="wlEmail" class="wl-in" type="email" placeholder="you@example.com" autocomplete="email">
+    <p id="wlMsg" style="min-height:19px;font-size:12.5px;margin-top:9px;color:var(--tx-3)"></p>
+    <div style="display:flex;gap:9px;margin-top:10px">
+      <button class="btn btn-2" style="flex:1" type="button" onclick="closeWL()">Cancel</button>
+      <button class="btn btn-1" style="flex:2" type="button" id="wlGo">Join</button>
     </div>
   </div>
 </div>
 
 <script>
-var REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
+(function(){
+'use strict';
+var RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+/* Opt into hide-then-reveal only now that script is running. Without JS, or if
+   this line never executes, every .rv element stays visible. */
+if(!RM) document.documentElement.classList.add('motion');
 
-/* Opt into the hidden-then-reveal state only now that script is running. */
-if(!REDUCE) document.documentElement.classList.add('anim');
-
-/* ── reveals ──────────────────────────────────────────────────────────────── */
-var io=new IntersectionObserver(function(es){
-  es.forEach(function(e){
-    if(!e.isIntersecting) return;
-    e.target.classList.add('in');
-    e.target.querySelectorAll('.lineMask').forEach(function(m,i){
-      setTimeout(function(){ m.classList.add('in'); }, i*110);
-    });
-    io.unobserve(e.target);
-  });
-},{threshold:.12,rootMargin:'0px 0px -8% 0px'});
-
-document.querySelectorAll('.rv').forEach(function(el,i){
-  el.style.transitionDelay=(Math.min(i,6)*55)+'ms';
-  io.observe(el);
-});
-
-/* Above the fold reveals immediately — waiting on the observer leaves the hero
-   blank for most of a second, which is the "looks broken" failure this page has
-   already shipped once. */
+/* ── reveals ───────────────────────────────────────────────────────────── */
+var io = new IntersectionObserver(function(es){
+  es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+},{threshold:.08,rootMargin:'0px 0px -6% 0px'});
+var rvs = [].slice.call(document.querySelectorAll('.rv'));
+rvs.forEach(function(el,i){ el.style.transitionDelay = (Math.min(i,4)*60)+'ms'; io.observe(el); });
+/* anything already on screen reveals immediately — no blank first paint */
 requestAnimationFrame(function(){
-  document.querySelectorAll('.rv').forEach(function(el){
-    if(el.getBoundingClientRect().top < innerHeight){
-      el.classList.add('in');
-      el.querySelectorAll('.lineMask').forEach(function(m,i){ setTimeout(function(){ m.classList.add('in'); },120+i*110); });
-      io.unobserve(el);
-    }
+  rvs.forEach(function(el){
+    if(el.getBoundingClientRect().top < innerHeight){ el.classList.add('in'); io.unobserve(el); }
   });
 });
-setTimeout(function(){   /* last-resort: nothing stays invisible */
-  document.querySelectorAll('.rv:not(.in)').forEach(function(el){
-    if(el.getBoundingClientRect().top < innerHeight*1.5) el.classList.add('in');
-  });
-  document.querySelectorAll('.lineMask:not(.in)').forEach(function(m){
-    if(m.getBoundingClientRect().top < innerHeight) m.classList.add('in');
-  });
-},2600);
+/* absolute backstop: nothing stays hidden, whatever happens */
+setTimeout(function(){ rvs.forEach(function(el){ el.classList.add('in'); }); }, 4000);
 
-/* Absolute backstop: after 5s nothing on the page is allowed to still be
-   hidden by a reveal class. */
-setTimeout(function(){
-  document.querySelectorAll('.agent:not(.lit),.row:not(.lit)').forEach(function(el){ el.classList.add('lit'); });
-  document.querySelectorAll('.rv:not(.in)').forEach(function(el){ el.classList.add('in'); });
-  document.querySelectorAll('.lineMask:not(.in)').forEach(function(el){ el.classList.add('in'); });
-},5000);
+/* ── nav ───────────────────────────────────────────────────────────────── */
+var nav = document.getElementById('nav');
+addEventListener('scroll', function(){ nav.classList.toggle('stuck', scrollY > 20); }, {passive:true});
 
-/* ── nav state + scroll progress ──────────────────────────────────────────── */
-var nav=document.getElementById('nav'), prog=document.getElementById('prog');
-function onScroll(){
-  nav.classList.toggle('stuck', scrollY>12);
-  var max=document.documentElement.scrollHeight-innerHeight;
-  prog.style.width=(max>0 ? (scrollY/max*100) : 0)+'%';
-}
-addEventListener('scroll',onScroll,{passive:true}); onScroll();
-
-/* ── parallax on the product panels ───────────────────────────────────────── */
-if(!REDUCE){
-  var pars=[].slice.call(document.querySelectorAll('.par'));
-  var ticking=false;
-  addEventListener('scroll',function(){
-    if(ticking) return; ticking=true;
-    requestAnimationFrame(function(){
-      var vh=innerHeight;
-      pars.forEach(function(el){
-        var r=el.getBoundingClientRect();
-        if(r.bottom<0||r.top>vh) return;
-        var mid=(r.top+r.height/2-vh/2)/vh;      /* -1 .. 1 across the viewport */
-        el.style.setProperty('--py',(mid*parseFloat(el.dataset.par||12)).toFixed(1)+'px');
-        el.style.transform='translate3d(0,var(--py,0),0)';
-      });
-      ticking=false;
-    });
-  },{passive:true});
-}
-
-/* ── count-up numbers ─────────────────────────────────────────────────────── */
-var countIO=new IntersectionObserver(function(es){
+/* ── count-ups ─────────────────────────────────────────────────────────── */
+var cio = new IntersectionObserver(function(es){
   es.forEach(function(e){
     if(!e.isIntersecting) return;
-    var el=e.target, to=parseFloat(el.dataset.to)||0;
-    countIO.unobserve(el);
-    if(REDUCE){ el.textContent=to; return; }
-    var t0=performance.now(), dur=1100;
+    var el=e.target, to=parseFloat(el.dataset.to)||0; cio.unobserve(el);
+    if(RM){ el.textContent = to.toLocaleString(); return; }
+    var t0=performance.now();
     (function step(now){
-      var p=Math.min(1,(now-t0)/dur);
-      el.textContent=Math.round(to*(1-Math.pow(1-p,3)));   /* ease-out cubic */
+      var p=Math.min(1,(now-t0)/900);
+      el.textContent = Math.round(to*(1-Math.pow(1-p,3))).toLocaleString();
       if(p<1) requestAnimationFrame(step);
     })(performance.now());
   });
-},{threshold:.6});
-document.querySelectorAll('.count').forEach(function(el){ countIO.observe(el); });
+},{threshold:.5});
+document.querySelectorAll('.count').forEach(function(el){ cio.observe(el); });
 
-/* ── staggered lighting for agents + dashboard rows ───────────────────────── */
-function stagger(container,sel,step){
-  var fired=false;
-  function go(){
-    if(fired) return; fired=true;
-    container.querySelectorAll(sel).forEach(function(it,i){
-      setTimeout(function(){ it.classList.add('lit'); }, REDUCE?0:i*step);
-    });
-  }
-  /* Already on screen when called — light it now rather than waiting for an
-     intersection change that may never come. */
-  var r=container.getBoundingClientRect();
-  if(r.top < innerHeight && r.bottom > 0){ go(); return; }
+/* ── agent registry ────────────────────────────────────────────────────────
+   Fallback mirrors lib/agents.js, but /api/atlas/agents overrides it so the
+   page reflects the running system rather than a second hardcoded list. */
+var ICON = {memory:'memory',tasks:'tasks',research:'research',finance:'finance',jobs:'jobs',
+  news:'news',writing:'writing',coach:'coach',contacts:'contacts',invoice:'invoice',
+  email:'email',calendar:'calendar',whatsapp:'whatsapp',travel:'travel',trading:'trading',
+  health:'health',shopping:'shopping',legal:'legal',social:'social',code:'code'};
+var EXAMPLE = {
+  memory:'“Remember I prefer short replies.”', tasks:'“Remind me to chase the invoice Friday.”',
+  research:'“Why are my competitors growing faster?”', finance:'“I spent £120 on software.”',
+  jobs:'“Tailor my CV for this role.”', news:'“What should I know this morning?”',
+  writing:'“Draft a LinkedIn post about this.”', coach:'“Help me decide between these two offers.”',
+  contacts:'“Sarah at Creative Agency is a client.”', invoice:'“Invoice her £2,500 for the logo.”',
+  email:'“Draft a reply to the landlord.”', calendar:'“What have I got on Thursday?”'
+};
+var FALLBACK = {
+  live:[['memory','Memory','Stores and recalls long-term facts about you'],
+        ['tasks','Tasks','Captures, prioritises and tracks your todos'],
+        ['research','Research','Searches the web and summarises findings'],
+        ['finance','Finance','Tracks income, expenses and invoices'],
+        ['jobs','Jobs','Tailors your CV, writes cover letters, scores fit'],
+        ['news','News','Builds a daily briefing on topics you care about'],
+        ['writing','Writing','Drafts emails, posts, reports and letters'],
+        ['coach','Coach','Talks through goals, habits and decisions'],
+        ['contacts','Contacts','Remembers people, companies and relationships'],
+        ['invoice','Invoice','Raises invoices and drafts chasers']],
+  planned:[['email','Email','a Google connection'],['calendar','Calendar','a Google connection'],
+        ['whatsapp','WhatsApp','the WhatsApp Business API'],['travel','Travel','a booking provider'],
+        ['trading','Trading','a brokerage API'],['health','Health','Apple Health or Google Fit'],
+        ['shopping','Shopping','a retail price API'],['legal','Legal','document review tooling'],
+        ['social','Social','LinkedIn or X API access'],['code','Code','a repository connection']]
+};
 
-  var ob=new IntersectionObserver(function(es){
-    es.forEach(function(e){ if(e.isIntersecting){ ob.disconnect(); go(); } });
-  },{threshold:.15});
-  ob.observe(container);
+function esc(s){ return String(s).replace(/[&<>"]/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function ic(k){ return ICON[k] ? 'i-'+ICON[k] : 'i-atlas'; }
 
-  setTimeout(go,4000);   /* whatever happens, it does not stay invisible */
-}
-var dash=document.getElementById('dash');
-if(dash) stagger(dash,'.row',70);
+function render(live, planned){
+  var net=document.getElementById('net'), wires=document.getElementById('wires');
+  var info=document.getElementById('netInfo'), list=document.getElementById('netList');
 
-/* ── panel tilt on pointer ────────────────────────────────────────────────── */
-if(!REDUCE && matchMedia('(hover:hover)').matches){
-  document.querySelectorAll('.tilt').forEach(function(el){
-    el.addEventListener('mousemove',function(ev){
-      var r=el.getBoundingClientRect();
-      var x=(ev.clientX-r.left)/r.width-.5, y=(ev.clientY-r.top)/r.height-.5;
-      el.style.transform='perspective(900px) rotateY('+(x*4).toFixed(2)+'deg) rotateX('+(-y*4).toFixed(2)+'deg) translate3d(0,var(--py,0),0)';
-    });
-    el.addEventListener('mouseleave',function(){
-      el.style.transform='translate3d(0,var(--py,0),0)';
-    });
+  document.getElementById('mLive').textContent = live.length;
+  document.getElementById('mPlan').textContent = planned.length;
+  document.getElementById('bLive').textContent = live.length;
+  document.getElementById('bPlan').textContent = planned.length;
+  document.getElementById('coreCount').textContent = live.length + ' live';
+
+  /* status board */
+  document.getElementById('chipsLive').innerHTML = live.map(function(a){
+    return '<span class="chip"><i class="st st-live"></i>'+esc(a[1])+'</span>'; }).join('');
+  document.getElementById('chipsPlan').innerHTML = planned.map(function(a){
+    return '<span class="chip off"><i class="st st-off"></i>'+esc(a[1])+'</span>'; }).join('');
+
+  /* mobile list */
+  list.innerHTML = live.map(function(a){
+      return '<div class="net-li"><svg aria-hidden="true"><use href="#'+ic(a[0])+'"/></svg>'+
+        '<div><div class="nm">'+esc(a[1])+'</div><div class="ds">'+esc(a[2])+'</div></div>'+
+        '<span class="tag tag-live tg"><i class="st st-live"></i>Live</span></div>'; }).join('') +
+    planned.map(function(a){
+      return '<div class="net-li off"><svg aria-hidden="true"><use href="#'+ic(a[0])+'"/></svg>'+
+        '<div><div class="nm">'+esc(a[1])+'</div><div class="ds">Needs '+esc(a[2])+'</div></div>'+
+        '<span class="tag tg">Planned</span></div>'; }).join('');
+
+  /* radial network — live on the inner orbit, planned further out */
+  net.querySelectorAll('.node').forEach(function(n){ n.remove(); });
+  var all = live.map(function(a){ return {k:a[0],n:a[1],d:a[2],on:true}; })
+            .concat(planned.map(function(a){ return {k:a[0],n:a[1],d:'Needs '+a[2],on:false}; }));
+  var w=net.clientWidth||760, h=net.clientHeight||440, cx=w/2, cy=h/2;
+  var rIn=Math.min(w,h)*0.315, rOut=Math.min(w,h)*0.475;
+  var lines=[];
+  all.forEach(function(a,i){
+    var ring = a.on ? live.length : planned.length;
+    var idx  = a.on ? i : i-live.length;
+    var r    = a.on ? rIn : rOut;
+    var ang  = (idx/ring)*Math.PI*2 - Math.PI/2 + (a.on?0:Math.PI/ring);
+    var x=cx+Math.cos(ang)*r, y=cy+Math.sin(ang)*r*0.86;
+    var el=document.createElement('button');
+    el.type='button';
+    el.className='node'+(a.on?'':' off');
+    el.style.left=x+'px'; el.style.top=y+'px';
+    el.innerHTML='<svg aria-hidden="true"><use href="#'+ic(a.k)+'"/></svg><span>'+esc(a.n)+'</span>';
+    el.setAttribute('aria-label',a.n+(a.on?' — live':' — planned'));
+    el.addEventListener('mouseenter',function(){ select(a,i); });
+    el.addEventListener('focus',function(){ select(a,i); });
+    el.addEventListener('click',function(){ select(a,i); });
+    net.appendChild(el);
+    lines.push('<line class="wire" data-i="'+i+'" x1="'+cx+'" y1="'+cy+'" x2="'+x+'" y2="'+y+'"/>');
   });
+  wires.innerHTML = lines.join('');
+
+  function select(a,i){
+    net.querySelectorAll('.node').forEach(function(n,j){ n.classList.toggle('sel', j===i); });
+    wires.querySelectorAll('.wire').forEach(function(l,j){ l.classList.toggle('hot', j===i); });
+    info.innerHTML =
+      '<div class="ic"><svg aria-hidden="true"><use href="#'+ic(a.k)+'"/></svg></div>'+
+      '<h4>'+esc(a.n)+'</h4>'+
+      '<span class="tag '+(a.on?'tag-live':'')+'">'+(a.on?'<i class="st st-live"></i>Live':'Planned')+'</span>'+
+      '<p style="margin-top:12px">'+esc(a.d)+'</p>'+
+      (a.on && EXAMPLE[a.k] ? '<div class="ex">'+esc(EXAMPLE[a.k])+'</div>'
+                            : '<div class="ex">Atlas will say it can\'t do this yet, and offer to help another way.</div>');
+  }
+  select(all[0],0);
+
+  /* the hero rail shares this registry — one source, no second hardcoded list */
+  var rail=document.getElementById('rail');
+  if(rail){
+    rail.innerHTML = all.slice(0,14).map(function(a){
+      return '<span class="rail-i'+(a.on?'':' off-agent')+'" data-k="'+esc(a.k)+'">'+
+             '<svg aria-hidden="true"><use href="#'+ic(a.k)+'"/></svg>'+esc(a.n)+'</span>';
+    }).join('');
+  }
 }
 
-/* ── the hero chat actually runs ──────────────────────────────────────────
-   Three exchanges on a loop, each typed then answered. Shows the honest reply
-   format: a tick only for what was genuinely written, an en dash for what is
-   merely drafted. */
-var SCRIPT=[
-  { ask:"I spent £85 at Waitrose and need to invoice Sarah at Creative Agency £2,500 for the logo project",
-    say:"✓ Logged the £85 Waitrose expense.<br>✓ Saved Sarah — Creative Agency, client.<br>– Invoice for £2,500 is ready to raise whenever you say.",
-    chips:["Finance","Contacts","Invoice"],
-    saved:"1 expense · 1 contact · 1 task" },
-  { ask:"Book me a flight to Lisbon on the 14th",
-    say:"I can't book flights — Travel isn't connected yet, and I won't pretend it is.<br>I've added a task to book it, and I can draft the itinerary now if that helps.",
-    chips:["Travel","Tasks"], off:[0],
-    saved:"1 task" },
-  { ask:"What's worth my attention this morning?",
-    say:"Two things.<br>– Creative Agency is 4 days overdue at £2,500.<br>– Thursday's interview prep is still open, and it's Tuesday.",
-    chips:["Briefing","Invoice","Tasks"],
-    saved:"nothing — this one was just a question" }
+render(FALLBACK.live, FALLBACK.planned);
+fetch('/api/atlas/agents').then(function(r){ return r.ok?r.json():null; }).then(function(d){
+  if(!d || !d.live || !d.planned) return;
+  var trim=function(s){ return String(s).replace(/\s*Agent$/,''); };
+  render(
+    d.live.map(function(a){ return [a.key, trim(a.name), a.description||'']; }),
+    d.planned.map(function(a){ return [a.key, trim(a.name),
+      (a.needs==='configuration'?'a Google connection':(a.needs||'configuration'))]; })
+  );
+}).catch(function(){});
+addEventListener('resize', (function(){ var t; return function(){
+  clearTimeout(t); t=setTimeout(function(){ location.reload===null; }, 400); }; })());
+
+/* ── hero orchestration ────────────────────────────────────────────────────
+   Three scripted sequences. The middle one is a refusal — that is the point of
+   the product, not an edge case, so it stays in rotation. */
+var SEQ = [
+ { ask:'Handle my priorities for today.',
+   think:'Reading your context',
+   steps:[
+     {i:'i-memory',   n:'Memory',   d:'4 relevant facts retrieved', s:'live', t:'0.4s'},
+     {i:'i-tasks',    n:'Tasks',    d:'7 open, 3 due today',        s:'live', t:'0.6s'},
+     {i:'i-finance',  n:'Finance',  d:'1 invoice 4 days overdue',   s:'live', t:'0.5s'},
+     {i:'i-atlas',    n:'Atlas',    d:'Day organised — one thing needs you', s:'live', t:''}
+   ]},
+ { ask:'Book me a flight to Lisbon on the 14th.',
+   think:'Checking what I can reach',
+   refuse:'Travel isn\'t connected, so I can\'t book that — and I won\'t pretend otherwise.',
+   steps:[
+     {i:'i-travel',   n:'Travel',   d:'Not connected — no booking provider', s:'off',  t:''},
+     {i:'i-tasks',    n:'Tasks',    d:'Added “book Lisbon flight, 14th”',    s:'live', t:'0.3s'}
+   ]},
+ { ask:'Invoice Sarah £2,500 for the logo project.',
+   think:'Matching this to your records',
+   steps:[
+     {i:'i-contacts', n:'Contacts', d:'Sarah — Creative Agency, client', s:'live', t:'0.3s'},
+     {i:'i-invoice',  n:'Invoice',  d:'Draft prepared, £2,500',         s:'live', t:'0.7s'}
+   ],
+   approve:{n:'Raise invoice?', d:'£2,500 · Creative Agency'} }
 ];
 
-(function chatLoop(){
-  var box=document.getElementById('chat');
-  if(!box) return;
+(function orchestrate(){
+  var box=document.getElementById('orch'); if(!box) return;
+  var alive=true, i=0, timers=[];
+  function clear(){ timers.forEach(clearTimeout); timers=[]; }
+  function at(ms,fn){ timers.push(setTimeout(fn,ms)); }
 
-  function el(html){ var d=document.createElement('div'); d.innerHTML=html; return d.firstElementChild; }
-  function mark(sm){ return '<div class="atlas-mark'+(sm?'" style="width:22px;height:22px;font-size:9px"':'"')+'>A</div>'; }
-
-  function render(step){
-    var chips=step.chips.map(function(c,i){
-      var off=(step.off||[]).indexOf(i)>=0;
-      return '<span class="chip'+(off?'':' live')+'" style="animation-delay:'+(i*90)+'ms"><span class="led"></span>'+c+'</span>';
-    }).join('');
-    return '<div class="msg at enter">'+mark(true)+
-           '<div class="bubble">'+step.say+
-           '<div class="chips">'+chips+'</div>'+
-           '<div class="saved">Written to your account: <b>'+step.saved+'</b></div>'+
-           '</div></div>';
+  function stepHTML(s,k){
+    var cls = s.s==='off' ? 'st-off' : (s.s==='wait' ? 'st-wait' : 'st-live');
+    return '<div class="step" style="animation-delay:'+(k*90)+'ms">'+
+      '<span class="step-ic"><svg aria-hidden="true"><use href="#'+s.i+'"/></svg></span>'+
+      '<span class="step-txt"><span class="step-n">'+esc(s.n)+'</span><span class="step-d">'+esc(s.d)+'</span></span>'+
+      (s.t?'<span class="step-time">'+s.t+'</span>':'')+
+      '<i class="st '+cls+' step-r"></i></div>';
   }
 
-  var i=0, alive=true;
   function run(){
     if(!alive) return;
-    var step=SCRIPT[i%SCRIPT.length]; i++;
-    box.innerHTML='';
+    var q=SEQ[i%SEQ.length]; i++;
+    box.innerHTML='<div class="req"><span class="req-av">You</span>'+
+                  '<span class="req-tx"><span id="typ"></span><span class="caret"></span></span></div>';
+    var typ=box.querySelector('#typ');
 
-    var ask=el('<div class="msg me enter"><div class="bubble"><span class="t"></span><span class="caret"></span></div></div>');
-    box.appendChild(ask);
-    var span=ask.querySelector('.t'), caret=ask.querySelector('.caret');
-
-    if(REDUCE){
-      span.textContent=step.ask; caret.remove();
-      box.insertAdjacentHTML('beforeend',render(step));
-      return;                                  /* no loop under reduced motion */
+    if(RM){
+      typ.textContent=q.ask;
+      var c=box.querySelector('.caret'); if(c) c.remove();
+      box.insertAdjacentHTML('beforeend', body(q));
+      lightRail(q);
+      return;
     }
-
     var n=0;
     (function type(){
       if(!alive) return;
-      span.textContent=step.ask.slice(0,++n);
-      if(n<step.ask.length) return setTimeout(type,15+Math.random()*22);
-      caret.remove();
-
-      var dots=el('<div class="msg at enter">'+mark(true)+'<div class="bubble"><span class="typing"><i></i><i></i><i></i></span></div></div>');
-      box.appendChild(dots);
-      setTimeout(function(){
+      typ.textContent=q.ask.slice(0,++n);
+      if(n<q.ask.length) return at(16+Math.random()*20,type);
+      var c=box.querySelector('.caret'); if(c) c.remove();
+      box.insertAdjacentHTML('beforeend',
+        '<div class="think" id="th"><span>'+esc(q.think)+'</span><span class="bar"></span></div>');
+      at(1150,function(){
         if(!alive) return;
-        dots.remove();
-        box.insertAdjacentHTML('beforeend',render(step));
-        setTimeout(run,4200);                  /* hold, then next exchange */
-      },1150);
+        var th=box.querySelector('#th'); if(th) th.remove();
+        box.insertAdjacentHTML('beforeend', body(q));
+        lightRail(q);
+        at(5200,run);
+      });
     })();
   }
 
-  /* only run while the panel is on screen — no work in a background tab */
+  function lightRail(q){
+    /* Only agents that actually did work light up. The refusal sequence names
+       Travel, but Travel is not built — lighting it green would be precisely the
+       false signal this product exists to avoid. */
+    var live = q.steps.filter(function(s){ return s.s !== 'off'; })
+                      .map(function(s){ return s.n.toLowerCase(); });
+    var blocked = q.steps.filter(function(s){ return s.s === 'off'; })
+                         .map(function(s){ return s.n.toLowerCase(); });
+    document.querySelectorAll('.rail-i').forEach(function(el){
+      var n = el.textContent.trim().toLowerCase();
+      el.classList.toggle('on', live.indexOf(n) >= 0);
+      el.classList.toggle('blocked', blocked.indexOf(n) >= 0);
+    });
+  }
+
+  function body(q){
+    var h='';
+    if(q.refuse){
+      h+='<div class="step" style="border-color:rgba(245,165,36,.3);background:rgba(245,165,36,.05)">'+
+         '<span class="step-ic" style="color:var(--wait)"><svg aria-hidden="true"><use href="#i-atlas"/></svg></span>'+
+         '<span class="step-txt"><span class="step-n">Atlas</span><span class="step-d">'+esc(q.refuse)+'</span></span></div>';
+    }
+    h+='<div class="steps">'+q.steps.map(stepHTML).join('')+'</div>';
+    if(q.approve){
+      h+='<div class="step approve" style="animation-delay:'+(q.steps.length*90+120)+'ms">'+
+         '<span class="step-ic" style="color:var(--wait)"><svg aria-hidden="true"><use href="#i-lock"/></svg></span>'+
+         '<span class="step-txt"><span class="step-n">'+esc(q.approve.n)+'</span><span class="step-d">'+esc(q.approve.d)+'</span></span>'+
+         '<span class="approve-actions"><button class="mini mini-y" type="button">Approve</button>'+
+         '<button class="mini" type="button">Edit</button></span></div>';
+    }
+    h+='<div class="demo-note">Illustrative sequence</div>';
+    return h;
+  }
+
+  /* pause when off screen — no work in a background tab */
   new IntersectionObserver(function(es){
     es.forEach(function(e){
       if(e.isIntersecting && !alive){ alive=true; run(); }
-      else if(!e.isIntersecting){ alive=false; }
+      else if(!e.isIntersecting && alive){ alive=false; clear(); }
     });
-  },{threshold:.25}).observe(document.getElementById('chatPanel'));
-
+  },{threshold:.2}).observe(box);
   run();
 })();
 
-/* ── agent grid, from the live API ────────────────────────────────────────── */
-(function agents(){
-  var grid=document.getElementById('agentGrid');
-  if(!grid) return;
+/* ── faq: keep one open at a time ──────────────────────────────────────── */
+var fqs=[].slice.call(document.querySelectorAll('.fq'));
+fqs.forEach(function(d){
+  var btn=d.querySelector('button');
+  btn.addEventListener('click',function(ev){
+    ev.preventDefault();
+    var was=d.open;
+    fqs.forEach(function(o){ o.open=false; });
+    d.open=!was;
+  });
+});
 
-  var FALLBACK_LIVE=['Memory','Tasks','Research','Finance','Jobs','News','Writing','Coach','Contacts','Invoice'];
-  var FALLBACK_PLANNED=[['Email','needs connecting'],['Calendar','needs connecting'],
-    ['WhatsApp','WhatsApp Business API'],['Travel','a booking provider'],['Trading','a brokerage API'],
-    ['Health','Apple Health or Google Fit'],['Shopping','a retail price API'],['Legal','document tooling'],
-    ['Social','LinkedIn or X API'],['Code','a repo connection']];
-
-  function esc(s){ return String(s).replace(/[&<>"]/g,function(c){
-    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
-
-  function render(live,planned){
-    grid.innerHTML =
-      live.map(function(n){ return '<div class="agent on"><span class="led"></span><span class="name">'+esc(n)+'</span></div>'; }).join('')+
-      planned.map(function(p){ return '<div class="agent off"><span class="led"></span><span class="name">'+esc(p[0])+
-        '</span><span class="needs">'+esc(p[1]||'')+'</span></div>'; }).join('');
-    var s=document.getElementById('statAgents');
-    if(s){ s.dataset.to=live.length; if(s.textContent==='0'&&REDUCE) s.textContent=live.length; }
-    var n=document.getElementById('navCount'); if(n) n.textContent=live.length+' agents connected';
-    stagger(grid,'.agent',45);
-  }
-
-  render(FALLBACK_LIVE,FALLBACK_PLANNED);
-
-  fetch('/api/atlas/agents').then(function(r){ return r.ok?r.json():null; }).then(function(d){
-    if(!d||!d.live||!d.planned) return;
-    var trim=function(s){ return String(s).replace(/\s*Agent$/,''); };
-    render(d.live.map(function(a){ return trim(a.name); }),
-           d.planned.map(function(a){ return [trim(a.name), a.needs==='configuration'?'needs connecting':a.needs]; }));
-  }).catch(function(){});
-})();
-
-/* ── waitlist ─────────────────────────────────────────────────────────────── */
+/* ── waitlist ──────────────────────────────────────────────────────────── */
 var wl=document.getElementById('wl');
-function openWL(){ wl.classList.add('on'); setTimeout(function(){ document.getElementById('wlEmail').focus(); },60); }
-function closeWL(){ wl.classList.remove('on'); document.getElementById('wlMsg').textContent=''; }
+window.openWL=function(){ wl.classList.add('on'); setTimeout(function(){ document.getElementById('wlEmail').focus(); },50); };
+window.closeWL=function(){ wl.classList.remove('on'); document.getElementById('wlMsg').textContent=''; };
 addEventListener('keydown',function(e){ if(e.key==='Escape') closeWL(); });
-document.getElementById('wlGo').addEventListener('click',submitWL);
-document.getElementById('wlEmail').addEventListener('keydown',function(e){ if(e.key==='Enter') submitWL(); });
 
 function submitWL(){
-  var input=document.getElementById('wlEmail'), msg=document.getElementById('wlMsg');
-  var email=(input.value||'').trim();
-  if(!email||email.indexOf('@')===-1){ msg.textContent='Please enter a valid email address.'; msg.style.color='#a33'; return; }
-  msg.textContent='Adding you…'; msg.style.color='var(--gold)';
+  var inp=document.getElementById('wlEmail'), msg=document.getElementById('wlMsg');
+  var email=(inp.value||'').trim();
+  if(!email || email.indexOf('@')===-1){ msg.textContent='Please enter a valid email address.'; msg.style.color='#F5A524'; return; }
+  msg.textContent='Adding you…'; msg.style.color='rgba(242,244,247,.40)';
   fetch('/api/waitlist',{method:'POST',headers:{'Content-Type':'application/json'},
-                         body:JSON.stringify({email:email,source:'landing'})})
+    body:JSON.stringify({email:email,source:'landing'})})
     .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
     .then(function(res){
       msg.textContent = res.ok ? (res.d.message||"You're on the list.") : (res.d.error||'Something went wrong.');
-      msg.style.color = res.ok ? 'var(--green)' : '#a33';
-      if(res.ok){ input.value=''; setTimeout(closeWL,2200); }
+      msg.style.color = res.ok ? '#3DD68C' : '#F5A524';
+      if(res.ok){ inp.value=''; setTimeout(closeWL,2000); }
     })
-    .catch(function(){ msg.textContent='Could not reach the server.'; msg.style.color='#a33'; });
+    .catch(function(){ msg.textContent='Could not reach the server.'; msg.style.color='#F5A524'; });
 }
+document.getElementById('wlGo').addEventListener('click',submitWL);
+document.getElementById('wlEmail').addEventListener('keydown',function(e){ if(e.key==='Enter') submitWL(); });
+})();
 </script>
 </body>
 </html>
