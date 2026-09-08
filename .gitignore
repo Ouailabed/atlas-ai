@@ -1,10 +1,13 @@
 node_modules/
 .next/
 *.log
+.vercel
 
 # Never commit real secrets.
 .env*
 
 # ...but DO commit the template, which contains no real values.
-# This exception must come after the .env* rule above to take effect.
+# This negation must stay LAST — a later .env* rule would re-ignore it.
+# (The Vercel CLI appends its own .env* line on `vercel link`; if that happens
+#  again, move this negation back to the bottom.)
 !.env.local.template
