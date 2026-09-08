@@ -4,1189 +4,680 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ATLAS — Your Personal AI. Always Working.</title>
-<!-- The hero is a 1.5MB background-image. Without preloading it, the first
-     paint is an empty stage and the page reads as broken. -->
-<link rel="preload" as="image" href="atlas-hero.png">
+<meta name="description" content="An autonomous AI operating system that handles your email, tasks, invoices and job applications — and tells you plainly what it cannot do.">
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
-html, body { background:#0a0806; color:#1a1a1a; font-family:'Segoe UI','Helvetica Neue',system-ui,sans-serif; overflow-x:hidden; cursor:none; }
-#scroll-driver { height:800vh; position:relative; }
-#stage { position:fixed; top:0; left:0; width:100%; height:100%; overflow:hidden;
-         /* Hero art is cream. Painting the stage dark first caused a visible
-            dark->light flash before the image decoded. */
-         background:#efe9e0; }
-#c { position:absolute; top:0; left:0; width:100%; height:100%; }
-#heroSeq { position:absolute; top:-10%; left:-10%; width:120%; height:120%;
-           opacity:0; transition:opacity 0.45s ease; will-change:transform,opacity;
-           transform-origin:center center; pointer-events:none; }
-#hero-img { position:absolute; top:-10%; left:-10%; width:120%; height:120%; background-image:url('atlas-hero.png'); background-size:cover; background-position:20% center; transform-origin:center center; will-change:transform; }
-#cur { position:fixed; width:10px; height:10px; background:#c9a84c; border-radius:50%; pointer-events:none; z-index:9999; transform:translate(-50%,-50%); }
-#cur-ring { position:fixed; width:40px; height:40px; border:1px solid rgba(201,168,76,0.3); border-radius:50%; pointer-events:none; z-index:9998; transform:translate(-50%,-50%); }
-nav { position:fixed; top:0; left:0; right:0; z-index:500; display:flex; justify-content:space-between; align-items:center; padding:22px 60px; transition:all 0.5s; }
-nav.light { background:rgba(240,236,230,0.92); backdrop-filter:blur(20px); border-bottom:1px solid rgba(0,0,0,0.06); }
-nav.dark { background:rgba(10,8,6,0.7); backdrop-filter:blur(20px); }
-nav.light .logo { color:#1a1a1a; }
-nav.dark .logo { color:#f0ece6; }
-nav.light .nav-link { color:rgba(26,26,26,0.45); }
-nav.dark .nav-link { color:rgba(240,236,230,0.45); }
-nav.light .nbtn { background:#1a1a1a; color:#f0ece6; }
-nav.dark .nbtn { background:rgba(201,168,76,0.9); color:#1a1a1a; }
-.logo { font-size:20px; font-weight:700; letter-spacing:5px; text-transform:uppercase; }
-.nav-links { display:flex; gap:40px; list-style:none; }
-.nav-link { text-decoration:none; font-size:12px; letter-spacing:2px; text-transform:uppercase; transition:color 0.3s; }
-.nav-link:hover { color:#c9a84c !important; }
-.nbtn { border:none; padding:12px 28px; border-radius:100px; cursor:none; font-weight:600; font-size:12px; letter-spacing:2px; text-transform:uppercase; transition:all 0.3s; }
-#sidenav { position:fixed; right:40px; top:50%; transform:translateY(-50%); z-index:500; display:flex; flex-direction:column; gap:16px; align-items:flex-end; }
-.sni { display:flex; align-items:center; gap:10px; cursor:none; opacity:0.2; transition:all 0.3s; }
-.sni.on { opacity:1; }
-.sni-label { font-size:9px; letter-spacing:2px; text-transform:uppercase; opacity:0; transition:opacity 0.3s; white-space:nowrap; color:#f0ece6; }
-.sni.on .sni-label { opacity:1; }
-.sni-num { font-size:9px; letter-spacing:2px; opacity:0; transition:opacity 0.3s; color:#f0ece6; }
-.sni.on .sni-num { opacity:1; }
-.sni-dot { width:5px; height:5px; border-radius:50%; background:#f0ece6; transition:all 0.3s; flex-shrink:0; }
-.sni.on .sni-dot { width:7px; height:7px; background:#c9a84c !important; box-shadow:0 0 8px rgba(201,168,76,0.6); }
-.scene-overlay { position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; padding:0 60px; pointer-events:none; z-index:10; opacity:0; }
-.scene-overlay.right { justify-content:flex-end; }
-.scene-overlay.center { justify-content:center; text-align:center; }
-.scene-text { max-width:520px; pointer-events:all; }
+/* ═══════════════════════════════════════════════════════════════════════════
+   ATLAS — landing page
 
-/* Scene 1 must never depend on the rAF loop having run. Previously every
-   .scene-overlay sat at opacity:0 until draw() painted its first frame, so the
-   page looked blank on arrival. Scene 1 now starts visible in CSS and animates
-   itself in, independent of JS. */
-#sc1 { opacity:1; }
+   Product-led, not image-led. Every panel below is live DOM built from the
+   same tokens as the real app, not a screenshot: crisp on any display, a few
+   KB instead of megabytes, and each element can be choreographed on its own.
 
-/* Readable by default. The hidden-then-animate state is opted INTO below, so a
-   reader can never end up staring at invisible text if the animation does not
-   run — which is the exact failure this whole change is fixing. */
-#sc1 .scene-text > * { opacity:1; transform:none; }
+   Light-dominant on purpose. The dark, glowing hero this replaced read as
+   generic AI imagery, which undercut the one thing Atlas actually has to
+   sell — that it tells you the truth about what it can and cannot do.
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-@media (prefers-reduced-motion: no-preference) {
-  #sc1 .scene-text > * { opacity:0; transform:translateY(26px); animation:heroIn 1.15s cubic-bezier(0.16,1,0.3,1) both; }
-  #sc1 .s-badge  { animation-delay:0.10s; }
-  #sc1 .s-h      { animation-delay:0.24s; }
-  #sc1 .s-p      { animation-delay:0.40s; }
-  #sc1 .s-btns   { animation-delay:0.56s; }
-  #sc1 .scene-text > p:last-child { animation-delay:0.70s; }
+:root{
+  --paper:#f7f4ef;
+  --paper-2:#efeae1;
+  --ink:#14120f;
+  --ink-70:rgba(20,18,15,0.72);
+  /* 0.66 / 0.60 rather than 0.45 / 0.25: at 11px those were measuring
+     1.7:1 against paper — unreadable, and well under the 4.5:1 AA floor.
+     0.60 clears 4.5 on all three surfaces the page uses (white 4.89,
+     paper 4.74, paper-2 4.60). Hierarchy now comes from size, weight and
+     letter-spacing instead of washing the ink out. */
+  --ink-45:rgba(20,18,15,0.66);
+  --ink-25:rgba(20,18,15,0.60);
+  --ink-12:rgba(20,18,15,0.12);
+  --ink-06:rgba(20,18,15,0.06);
+  --gold:#7d6022;          /* 5.36:1 on paper, 4.91:1 on paper-2 — #c9a84c is only 2.1:1 */
+  --gold-bright:#c9a84c;   /* the original, used only on dark panels */
+  --green:#2f7d4f;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --sans:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;
 }
-@keyframes heroIn { to { opacity:1; transform:translateY(0); } }
-.s-badge { display:inline-flex; align-items:center; gap:10px; background:rgba(201,168,76,0.1); border:1px solid rgba(201,168,76,0.25); border-radius:999px; padding:8px 20px; margin-bottom:28px; }
-.s-badge-dot { width:5px; height:5px; border-radius:50%; background:#c9a84c; animation:pd 2s infinite; }
-.s-badge span { font-size:11px; letter-spacing:3px; text-transform:uppercase; color:#c9a84c; }
-.s-num { font-size:11px; letter-spacing:5px; text-transform:uppercase; margin-bottom:14px; font-weight:700; color:#c9a84c; }
-.s-h { font-weight:300; line-height:1.05; letter-spacing:-3px; margin-bottom:20px; color:#f0ece6; }
-.s-h.dark-h { color:#1a1a1a; }
-.s-h strong { font-weight:800; }
-.s-h .gold { color:#c9a84c; font-style:italic; font-weight:300; }
-.s-p { font-size:19px; line-height:1.8; margin-bottom:36px; font-weight:300; color:rgba(240,236,230,0.6); }
-.s-p.dark-p { color:rgba(26,26,26,0.6); }
-.s-tags { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:36px; }
-.stag { border-radius:999px; padding:8px 20px; font-size:12px; letter-spacing:2px; text-transform:uppercase; background:rgba(240,236,230,0.05); border:1px solid rgba(240,236,230,0.1); color:rgba(240,236,230,0.55); }
-.stag.g { background:rgba(201,168,76,0.1); border-color:rgba(201,168,76,0.3); color:#c9a84c; }
-.s-btns { display:flex; gap:14px; flex-wrap:wrap; }
-.btn-d { background:#1a1a1a; color:#f0ece6; border:none; padding:17px 44px; border-radius:100px; font-size:14px; cursor:none; font-weight:600; letter-spacing:2px; text-transform:uppercase; transition:all 0.3s; display:flex; align-items:center; gap:10px; }
-.btn-d:hover { background:#333; transform:translateY(-2px); }
-.btn-d.gold-btn { background:linear-gradient(135deg,#c9a84c,#e8c96a); color:#1a1a1a; }
-.btn-o { background:transparent; border:1px solid rgba(26,26,26,0.25); color:#1a1a1a; padding:17px 44px; border-radius:100px; font-size:14px; cursor:none; letter-spacing:2px; text-transform:uppercase; transition:all 0.3s; }
-.btn-o.light-o { border-color:rgba(240,236,230,0.25); color:#f0ece6; }
-.btn-o:hover { transform:translateY(-2px); }
-#scroll-ind { position:fixed; bottom:36px; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; gap:8px; z-index:500; transition:opacity 0.5s; }
-#scroll-ind span { font-size:9px; letter-spacing:4px; text-transform:uppercase; color:rgba(240,236,230,0.4); }
-.scroll-icon { width:26px; height:42px; border:1px solid rgba(240,236,230,0.2); border-radius:999px; display:flex; align-items:flex-start; justify-content:center; padding-top:5px; }
-.scroll-dot { width:4px; height:8px; background:#c9a84c; border-radius:999px; animation:scrolldot 2s infinite; }
-#normal-content { position:relative; z-index:100; background:#f0ece6; }
-#stats { background:#1a1a1a; padding:72px 60px; display:flex; justify-content:center; flex-wrap:wrap; }
-.stat { text-align:center; padding:32px 72px; border-right:1px solid rgba(245,242,238,0.08); }
-.stat:last-child { border-right:none; }
-.stat-n { font-size:56px; font-weight:800; margin-bottom:8px; background:linear-gradient(135deg,#f0ece6,#c9a84c); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-.stat-l { font-size:12px; letter-spacing:4px; color:rgba(240,236,230,0.3); text-transform:uppercase; }
-#pricing { padding:140px 60px; background:#f0ece6; }
-.pricing-wrap { max-width:920px; margin:0 auto; }
-.pricing-head { text-align:center; margin-bottom:72px; }
-.pricing-head h2 { font-size:clamp(44px,5vw,64px); font-weight:300; letter-spacing:-2px; margin-bottom:16px; }
-.pricing-head h2 strong { font-weight:800; }
-.pricing-head p { color:rgba(26,26,26,0.45); font-size:18px; }
-.pricing-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
-.price-card { border-radius:24px; padding:56px 44px; position:relative; overflow:hidden; transition:transform 0.4s; }
-.price-card:hover { transform:translateY(-10px); }
-.price-card.reg { background:#fff; border:1px solid rgba(26,26,26,0.08); box-shadow:0 4px 40px rgba(0,0,0,0.05); }
-.price-card.pop { background:#1a1a1a; border:1px solid #1a1a1a; box-shadow:0 20px 60px rgba(26,26,26,0.2); }
-.pop-badge { position:absolute; top:0; left:50%; transform:translateX(-50%); background:linear-gradient(90deg,#c9a84c,#e8c96a); border-radius:0 0 12px 12px; padding:6px 20px; font-size:10px; font-weight:700; letter-spacing:3px; color:#1a1a1a; white-space:nowrap; }
-.price-name { font-size:11px; letter-spacing:5px; color:rgba(26,26,26,0.3); margin-bottom:20px; text-transform:uppercase; }
-.price-name.lt { color:rgba(240,236,230,0.3); }
-.price-name.mt { margin-top:20px; }
-.price-amt { font-size:72px; font-weight:900; line-height:1; margin-bottom:4px; color:#1a1a1a; }
-.price-amt.lt { color:#f0ece6; }
-.price-per { font-size:13px; color:rgba(26,26,26,0.3); margin-bottom:48px; letter-spacing:3px; }
-.price-per.lt { color:rgba(240,236,230,0.3); }
-.price-feats { list-style:none; margin-bottom:48px; }
-.price-feats li { font-size:16px; color:rgba(26,26,26,0.55); margin-bottom:18px; display:flex; align-items:center; gap:12px; }
-.price-feats li.lt { color:rgba(240,236,230,0.55); }
-.price-feats li span { color:#c9a84c; }
-.price-btn { width:100%; padding:18px; border-radius:100px; font-size:13px; cursor:none; font-weight:700; letter-spacing:3px; text-transform:uppercase; transition:all 0.3s; }
-.price-btn.out { background:transparent; color:#1a1a1a; border:1px solid rgba(26,26,26,0.15); }
-.price-btn.fill { background:linear-gradient(135deg,#c9a84c,#e8c96a); color:#1a1a1a; border:none; }
-#cta-section { padding:120px 60px; text-align:center; position:relative; overflow:hidden; background:#f0ece6; }
-#cta-section::before { content:''; position:absolute; inset:0; background-image:url('atlas-hero.png'); background-size:cover; background-position:center; opacity:0.07; }
-#cta-section::after { content:''; position:absolute; inset:0; background:radial-gradient(ellipse at center,rgba(240,236,230,0.4) 0%,rgba(240,236,230,0.97) 65%); }
-.cta-inner { position:relative; z-index:2; }
-.cta-pre { font-size:13px; letter-spacing:6px; color:#c9a84c; text-transform:uppercase; margin-bottom:24px; }
-.cta-h { font-size:clamp(52px,7vw,92px); font-weight:300; line-height:1.05; letter-spacing:-3px; margin-bottom:20px; color:#1a1a1a; }
-.cta-h strong { font-weight:800; }
-.cta-sub { font-size:19px; color:rgba(26,26,26,0.45); margin-bottom:56px; }
-.cta-btns { display:flex; gap:14px; justify-content:center; }
-#bottom { background:#1a1a1a; padding:64px 60px; }
-.bottom-label { font-size:11px; letter-spacing:4px; color:rgba(240,236,230,0.2); text-transform:uppercase; text-align:center; margin-bottom:48px; }
-.bottom-grid { display:flex; justify-content:center; gap:72px; flex-wrap:wrap; margin-bottom:56px; }
-.bottom-item { text-align:center; }
-.bottom-icon { font-size:26px; margin-bottom:12px; }
-.bottom-name { font-size:10px; letter-spacing:3px; color:rgba(240,236,230,0.3); text-transform:uppercase; }
-.bottom-footer { text-align:center; color:rgba(240,236,230,0.12); font-size:11px; letter-spacing:2px; text-transform:uppercase; border-top:1px solid rgba(240,236,230,0.06); padding-top:40px; }
-.reveal { opacity:0; transform:translateY(28px); transition:all 0.9s cubic-bezier(0.16,1,0.3,1); }
-.reveal.v { opacity:1; transform:translateY(0); }
-@keyframes pd { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.8)} }
-@keyframes scrolldot { 0%{transform:translateY(0);opacity:1} 80%{transform:translateY(16px);opacity:0} 100%{transform:translateY(0);opacity:0} }
+
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+  line-height:1.6;
+}
+
+/* ── layout ───────────────────────────────────────────────────────────────── */
+.wrap{max-width:1180px;margin:0 auto;padding:0 32px}
+section{padding:130px 0;position:relative}
+@media(max-width:760px){section{padding:80px 0}.wrap{padding:0 22px}}
+
+.eyebrow{
+  font-size:11px;letter-spacing:3.5px;text-transform:uppercase;
+  color:var(--gold);font-weight:600;margin-bottom:20px;
+}
+h1,h2,h3{font-weight:400;letter-spacing:-0.03em;line-height:1.06}
+h1{font-size:clamp(44px,6.1vw,76px)}
+h2{font-size:clamp(34px,4.6vw,60px)}
+h3{font-size:clamp(20px,2.2vw,26px);letter-spacing:-0.02em;line-height:1.25}
+em{font-family:var(--serif);font-style:italic;font-weight:400}
+.lead{font-size:clamp(17px,1.65vw,20px);color:var(--ink-70);max-width:56ch;line-height:1.65}
+
+/* ── nav ──────────────────────────────────────────────────────────────────── */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:900;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 32px;
+  background:rgba(247,244,239,0.82);
+  backdrop-filter:blur(18px);
+  border-bottom:1px solid transparent;
+  transition:border-color .3s;
+}
+nav.stuck{border-bottom-color:var(--ink-06)}
+.logo{font-size:16px;font-weight:700;letter-spacing:5px;text-decoration:none;color:var(--ink)}
+.nav-links{display:flex;gap:34px;list-style:none}
+.nav-links a{font-size:13px;color:var(--ink-45);text-decoration:none;transition:color .2s}
+.nav-links a:hover{color:var(--ink)}
+@media(max-width:820px){.nav-links{display:none}}
+
+.btn{
+  display:inline-flex;align-items:center;gap:9px;
+  padding:13px 26px;border-radius:100px;border:1px solid transparent;
+  font-size:13.5px;font-weight:600;font-family:inherit;
+  text-decoration:none;cursor:pointer;transition:all .22s;white-space:nowrap;
+}
+.btn-primary{background:var(--ink);color:var(--paper)}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 10px 24px rgba(20,18,15,0.18)}
+.btn-ghost{border-color:var(--ink-12);color:var(--ink-70);background:transparent}
+.btn-ghost:hover{border-color:var(--ink);color:var(--ink)}
+
+/* ── hero ─────────────────────────────────────────────────────────────────── */
+#hero{padding-top:180px;padding-bottom:70px}
+@media(max-width:760px){#hero{padding-top:130px}}
+.hero-grid{display:grid;grid-template-columns:1.05fr 1fr;gap:64px;align-items:center}
+@media(max-width:980px){.hero-grid{grid-template-columns:1fr;gap:48px}}
+.hero-sub{margin:26px 0 34px}
+.hero-actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.hero-note{font-size:12.5px;color:var(--ink-25);margin-top:20px;letter-spacing:.3px}
+
+/* ── product surface: shared look for every live panel ────────────────────── */
+.panel{
+  background:#fff;
+  border:1px solid var(--ink-06);
+  border-radius:18px;
+  box-shadow:0 1px 2px rgba(20,18,15,.04), 0 18px 44px -20px rgba(20,18,15,.22);
+  overflow:hidden;
+}
+.panel-bar{
+  display:flex;align-items:center;gap:9px;
+  padding:13px 16px;border-bottom:1px solid var(--ink-06);
+  background:linear-gradient(#fff,#fcfaf7);
+}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--ink-12);display:inline-block}
+.panel-title{
+  font-size:11px;letter-spacing:2px;text-transform:uppercase;
+  color:var(--ink-25);margin-left:6px;font-weight:600;
+}
+.atlas-mark{
+  width:26px;height:26px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,#c9a84c,#e8c96a);
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:800;color:#14120f;
+}
+
+/* ── chat ─────────────────────────────────────────────────────────────────── */
+.chat{padding:20px}
+.msg{display:flex;gap:11px;margin-bottom:16px;align-items:flex-end}
+.msg.at{align-items:flex-start}   /* avatar tracks the top of a tall reply */
+.msg.me{justify-content:flex-end}
+.bubble{max-width:80%;padding:12px 16px;border-radius:16px;font-size:14.5px;line-height:1.6}
+.msg.me .bubble{background:var(--ink);color:var(--paper);border-bottom-right-radius:5px}
+.msg.at .bubble{background:var(--paper-2);color:var(--ink);border-bottom-left-radius:5px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}
+.chip{
+  font-size:10.5px;padding:3px 10px;border-radius:999px;
+  border:1px solid var(--ink-12);color:var(--ink-45);
+  display:inline-flex;align-items:center;gap:5px;
+}
+.chip .led{width:6px;height:6px;border-radius:50%;background:var(--ink-12)}
+.chip.live{border-color:rgba(47,125,79,.3);color:var(--green);background:rgba(47,125,79,.05)}
+.chip.live .led{background:var(--green)}
+.saved{margin-top:13px;padding-top:13px;border-top:1px dashed var(--ink-12);font-size:12px;color:var(--ink-45)}
+.saved b{color:var(--green);font-weight:600}
+.caret{
+  display:inline-block;width:2px;height:1em;background:var(--paper);
+  vertical-align:-2px;margin-left:1px;animation:blink 1s steps(2) infinite;
+}
+@keyframes blink{50%{opacity:0}}
+
+/* ── agent grid ───────────────────────────────────────────────────────────── */
+.agents{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:9px;margin-top:44px}
+.agent{
+  display:flex;align-items:center;gap:10px;
+  padding:13px 15px;border-radius:11px;
+  border:1px solid var(--ink-06);background:#fff;font-size:13.5px;
+}
+.agent .led{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.agent.on .led{background:var(--green);box-shadow:0 0 0 3px rgba(47,125,79,.14)}
+.agent.off{background:transparent;border-style:dashed}
+.agent.off .led{background:var(--ink-12)}
+.agent.off .name{color:var(--ink-25)}
+.agent .needs{margin-left:auto;font-size:10.5px;color:var(--ink-25);text-align:right;line-height:1.3}
+.legend{display:flex;gap:22px;flex-wrap:wrap;margin-top:26px;font-size:12.5px;color:var(--ink-45)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.swatch{width:7px;height:7px;border-radius:50%;display:inline-block}
+
+/* ── dashboard mock ───────────────────────────────────────────────────────── */
+.dash{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--ink-06)}
+@media(max-width:620px){.dash{grid-template-columns:1fr}}
+.cell{background:#fff;padding:18px 20px}
+.cell-l{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:13px}
+.row{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--ink-06);font-size:13.5px}
+.row:last-child{border-bottom:0}
+.row .tick{width:17px;height:17px;border-radius:50%;border:1.5px solid var(--ink-12);flex-shrink:0}
+.row .amt{margin-left:auto;font-weight:600;font-variant-numeric:tabular-nums}
+.sub{font-size:11.5px;color:var(--ink-25)}
+.new-flag{
+  font-size:9.5px;letter-spacing:1px;text-transform:uppercase;
+  color:var(--green);background:rgba(47,125,79,.09);
+  padding:2px 7px;border-radius:999px;margin-left:auto;font-weight:700;
+}
+
+/* ── jobs mock ────────────────────────────────────────────────────────────── */
+.jobs-grid{display:grid;grid-template-columns:auto 1fr;gap:26px;align-items:center;padding:22px}
+@media(max-width:620px){.jobs-grid{grid-template-columns:1fr;gap:16px}}
+.score{text-align:center;min-width:112px}
+.score-n{font-size:52px;font-weight:300;letter-spacing:-3px;line-height:1;color:var(--green)}
+.score-l{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--ink-25);margin-top:5px}
+.gaps{display:grid;grid-template-columns:1fr 1fr;gap:18px;font-size:13px}
+@media(max-width:520px){.gaps{grid-template-columns:1fr}}
+.gaps h4{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;font-weight:700}
+.gaps ul{list-style:none}
+.gaps li{padding:3px 0;color:var(--ink-70);display:flex;gap:7px}
+.docs{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--ink-06);border-top:1px solid var(--ink-06)}
+@media(max-width:620px){.docs{grid-template-columns:1fr}}
+.doc{background:#fff;padding:16px 20px}
+.doc pre{
+  font-family:var(--sans);font-size:11.5px;line-height:1.75;color:var(--ink-45);
+  white-space:pre-wrap;max-height:132px;overflow:hidden;
+  -webkit-mask-image:linear-gradient(#000 68%,transparent);
+  mask-image:linear-gradient(#000 68%,transparent);
+}
+
+/* ── split rows ───────────────────────────────────────────────────────────── */
+.split{display:grid;grid-template-columns:1fr 1.15fr;gap:64px;align-items:center}
+.split.flip{grid-template-columns:1.15fr 1fr}
+@media(max-width:980px){
+  .split,.split.flip{grid-template-columns:1fr;gap:36px}
+  .split.flip .copy{order:-1}
+}
+
+/* ── stats ────────────────────────────────────────────────────────────────── */
+#stats{border-top:1px solid var(--ink-06);border-bottom:1px solid var(--ink-06);padding:60px 0}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:26px;text-align:center}
+@media(max-width:760px){.stats-grid{grid-template-columns:repeat(2,1fr);gap:34px}}
+.stat-n{font-size:clamp(30px,3.6vw,44px);font-weight:300;letter-spacing:-2px}
+.stat-l{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--ink-25);margin-top:7px}
+
+/* ── pricing ──────────────────────────────────────────────────────────────── */
+.price-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:840px;margin:52px auto 0}
+@media(max-width:760px){.price-grid{grid-template-columns:1fr}}
+.price-card{border:1px solid var(--ink-12);border-radius:20px;padding:38px 34px;background:#fff}
+.price-card.pop{background:var(--ink);color:var(--paper);border-color:var(--ink);position:relative}
+.pop-badge{
+  position:absolute;top:-11px;left:50%;transform:translateX(-50%);
+  background:var(--gold-bright);color:#14120f;font-size:9.5px;font-weight:800;
+  letter-spacing:1.5px;padding:5px 14px;border-radius:999px;
+}
+.price-name{font-size:12px;letter-spacing:2.5px;text-transform:uppercase;color:var(--ink-45)}
+.price-card.pop .price-name{color:rgba(247,244,239,.55)}
+.price-amt{font-size:52px;font-weight:300;letter-spacing:-2.5px;margin:14px 0 2px}
+.price-per{font-size:12.5px;color:var(--ink-25);margin-bottom:26px}
+.price-card.pop .price-per{color:rgba(247,244,239,.45)}
+.price-feats{list-style:none;margin-bottom:30px}
+.price-feats li{padding:8px 0;font-size:14px;display:flex;gap:11px;color:var(--ink-70)}
+.price-card.pop .price-feats li{color:rgba(247,244,239,.82)}
+.price-feats i{color:var(--gold);font-weight:700;font-style:normal}
+.price-card.pop .price-feats i{color:var(--gold-bright)}
+.price-btn{width:100%;justify-content:center}
+
+/* ── cta / footer ─────────────────────────────────────────────────────────── */
+#cta{background:var(--ink);color:var(--paper);text-align:center}
+#cta .lead{color:rgba(247,244,239,.6);margin:0 auto}
+#cta .eyebrow{color:var(--gold-bright)}
+footer{padding:52px 0;border-top:1px solid var(--ink-06);font-size:12.5px;color:var(--ink-25)}
+.foot-row{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+
+/* ── reveal: visible by default, hidden only where motion is welcome ──────── */
+.rv{opacity:1;transform:none}
+@media (prefers-reduced-motion: no-preference){
+  .rv{opacity:0;transform:translateY(22px);
+      transition:opacity .8s cubic-bezier(.16,1,.3,1),transform .8s cubic-bezier(.16,1,.3,1)}
+  .rv.in{opacity:1;transform:none}
+}
+
+/* ── waitlist ─────────────────────────────────────────────────────────────── */
+#wl{position:fixed;inset:0;background:rgba(20,18,15,.55);backdrop-filter:blur(6px);
+    display:none;align-items:center;justify-content:center;z-index:1000;padding:22px}
+#wl.on{display:flex}
+.wl-card{background:#fff;border-radius:22px;padding:34px;max-width:430px;width:100%;
+         box-shadow:0 30px 80px rgba(20,18,15,.3)}
+.wl-in{width:100%;padding:14px 18px;border-radius:100px;border:1px solid var(--ink-12);
+       font-size:15px;font-family:inherit;outline:none;color:var(--ink)}
+.wl-in:focus{border-color:var(--ink)}
 </style>
 </head>
 <body>
 
-<div id="cur"></div>
-<div id="cur-ring"></div>
-
-<nav id="nav" class="light">
-  <div class="logo">Atlas</div>
+<nav id="nav">
+  <a href="#hero" class="logo">ATLAS</a>
   <ul class="nav-links">
-    <li><a href="#" class="nav-link">Features</a></li>
-    <li><a href="#" class="nav-link">Who it's for</a></li>
-    <li><a href="#pricing" class="nav-link">Pricing</a></li>
-    <li><a href="#" class="nav-link">About</a></li>
+    <li><a href="#honesty">What's real</a></li>
+    <li><a href="#capture">How it works</a></li>
+    <li><a href="#jobs">Job search</a></li>
+    <li><a href="#pricing">Pricing</a></li>
   </ul>
-  <button class="nbtn">Get Access</button>
+  <a href="/atlas" class="btn btn-primary">Try Atlas</a>
 </nav>
 
-<div id="sidenav">
-  <div class="sni on"><span class="sni-label">The Overview</span><span class="sni-num">01</span><div class="sni-dot"></div></div>
-  <div class="sni"><span class="sni-label">Your Systems</span><span class="sni-num">02</span><div class="sni-dot"></div></div>
-  <div class="sni"><span class="sni-label">In Action</span><span class="sni-num">03</span><div class="sni-dot"></div></div>
-  <div class="sni"><span class="sni-label">Decision Engine</span><span class="sni-num">04</span><div class="sni-dot"></div></div>
-  <div class="sni"><span class="sni-label">Always Working</span><span class="sni-num">05</span><div class="sni-dot"></div></div>
-  <div class="sni"><span class="sni-label">Atlas For You</span><span class="sni-num">06</span><div class="sni-dot"></div></div>
-</div>
-
-<div id="scroll-ind">
-  <div class="scroll-icon"><div class="scroll-dot"></div></div>
-  <span>Scroll to explore</span>
-</div>
-
-<div id="stage">
-  <div id="hero-img"></div>
-  <!-- Scroll-scrubbed hero footage. Stays hidden until every frame has
-       decoded, so a slow connection or a 404 leaves the static hero image
-       in place rather than a blank stage. -->
-  <canvas id="heroSeq"></canvas>
-  <canvas id="c"></canvas>
-
-  <div class="scene-overlay" id="sc1">
-    <div class="scene-text">
-      <div class="s-badge"><div class="s-badge-dot"></div><span>Private Beta · Limited Access</span></div>
-      <h1 class="s-h dark-h" style="font-size:clamp(60px,7.5vw,100px)">Your Personal AI.<br><span class="gold">Always Working.</span></h1>
-      <p class="s-p dark-p">Atlas handles your emails, calendar, job applications, finances, and daily decisions — so you can focus on the things that actually matter to you.</p>
-      <div class="s-btns">
-        <button class="btn-d" onclick="atlasWaitlist()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-          Join Waitlist
-        </button>
-        <button class="btn-o">Watch Demo</button>
-        <a class="btn-o" href="/atlas" style="text-decoration:none">Try Atlas Free</a>
+<!-- ═══ HERO ═══════════════════════════════════════════════════════════════ -->
+<section id="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <div class="eyebrow rv">Private beta · Limited access</div>
+      <h1 class="rv">Your personal AI.<br><em>Always working.</em></h1>
+      <p class="lead hero-sub rv">
+        Atlas handles your email, tasks, invoices, expenses and job applications —
+        and tells you plainly when it can't do something, instead of pretending it did.
+      </p>
+      <div class="hero-actions rv">
+        <a href="/atlas" class="btn btn-primary">
+          Try Atlas free
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+        <button class="btn btn-ghost" onclick="openWL()">Join the waitlist</button>
       </div>
-      <p style="color:rgba(26,26,26,0.35);font-size:12px;letter-spacing:2px;margin-top:20px">No credit card · Limited beta spots</p>
+      <p class="hero-note rv">No credit card · 5 free messages a day</p>
     </div>
-  </div>
 
-  <div class="scene-overlay" id="sc2">
-    <div class="scene-text">
-      <div class="s-num">02 — Your Systems</div>
-      <h2 class="s-h" style="font-size:clamp(40px,5vw,64px)">Every tool<br><strong>connected.</strong></h2>
-      <p class="s-p">Atlas connects to everything you already use and makes them work together as one seamless system.</p>
-      <div class="s-tags">
-        <span class="stag">Gmail</span><span class="stag">Calendar</span><span class="stag">Notion</span><span class="stag g">Finance</span><span class="stag g">Voice</span>
+    <!-- live chat panel: real markup, not a screenshot -->
+    <div class="panel rv" id="chatPanel">
+      <div class="panel-bar">
+        <div class="atlas-mark">A</div>
+        <span class="panel-title">Atlas</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--green);display:flex;align-items:center;gap:6px">
+          <span class="swatch" style="background:var(--green)"></span><span id="navCount">10 agents connected</span>
+        </span>
       </div>
-    </div>
-  </div>
-
-  <div class="scene-overlay right" id="sc3">
-    <div class="scene-text">
-      <div class="s-num">03 — In Action</div>
-      <h2 class="s-h" style="font-size:clamp(40px,5vw,64px)">Tasks completed.<br><strong>While you live.</strong></h2>
-      <p class="s-p">Emails written. Meetings booked. Applications submitted. Reports generated. All while you sleep.</p>
-      <div class="s-tags">
-        <span class="stag g">Autonomous</span><span class="stag">Voice-First</span><span class="stag">24/7</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="scene-overlay" id="sc4">
-    <div class="scene-text">
-      <div class="s-num">04 — Decision Engine</div>
-      <h2 class="s-h" style="font-size:clamp(40px,5vw,64px)">Atlas thinks,<br><strong>plans, decides.</strong></h2>
-      <p class="s-p">Real-time context, priority detection, and your personal data — genuine intelligence working for you.</p>
-      <div class="s-tags">
-        <span class="stag g">Context-Aware</span><span class="stag">Real-Time</span><span class="stag">Intelligent</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="scene-overlay right" id="sc5">
-    <div class="scene-text">
-      <div class="s-num">05 — Always Working</div>
-      <h2 class="s-h" style="font-size:clamp(40px,5vw,64px)">24/7 operations<br><strong>across your life.</strong></h2>
-      <p class="s-p">Nothing falls through the cracks. Atlas monitors everything — continuously, silently, perfectly.</p>
-      <div class="s-tags">
-        <span class="stag g">Always On</span><span class="stag">Proactive</span><span class="stag">Silent</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="scene-overlay center" id="sc6">
-    <div class="scene-text" style="max-width:700px">
-      <div class="s-num" style="text-align:center">06 — Atlas For You</div>
-      <h2 class="s-h" style="font-size:clamp(40px,5vw,64px);text-align:center">Personalized.<br><strong>Adaptive. Yours.</strong></h2>
-      <p class="s-p" style="text-align:center">Student, founder, trader, or executive — Atlas transforms completely to serve your specific world.</p>
-    </div>
-  </div>
-
-  <div class="scene-overlay center" id="sc7">
-    <div class="scene-text" style="max-width:700px">
-      <p style="font-size:13px;letter-spacing:6px;color:#c9a84c;text-transform:uppercase;margin-bottom:20px">Good morning.</p>
-      <h2 class="s-h" style="font-size:clamp(52px,7vw,92px);text-align:center">Your day is already<br><strong>taken care of.</strong></h2>
-      <p class="s-p" style="text-align:center">Join the waitlist. Be first when Atlas launches.</p>
-      <div style="display:flex;gap:14px;justify-content:center;margin-top:8px">
-        <button class="btn-d gold-btn" onclick="atlasWaitlist()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-          Join Free Waitlist
-        </button>
-        <button class="btn-o light-o">View Pricing</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div id="scroll-driver"></div>
-
-<div id="normal-content">
-  <div id="stats">
-    <div class="stat reveal"><div class="stat-n">2–4hrs</div><div class="stat-l">Saved Every Day</div></div>
-    <div class="stat reveal"><div class="stat-n">$300</div><div class="stat-l">Starting / Month</div></div>
-    <div class="stat reveal"><div class="stat-n">100+</div><div class="stat-l">AI Automations</div></div>
-    <div class="stat reveal"><div class="stat-n">24/7</div><div class="stat-l">Always Working</div></div>
-  </div>
-  <div id="pricing">
-    <div class="pricing-wrap">
-      <div class="pricing-head reveal"><h2><strong>Simple</strong> Pricing</h2><p>Less than a human assistant. More powerful than any tool.</p></div>
-      <div class="pricing-grid">
-        <div class="price-card reg reveal">
-          <div class="price-name">Pro</div>
-          <div class="price-amt">$299</div>
-          <div class="price-per">Per Month</div>
-          <ul class="price-feats">
-            <li><span>✓</span> Voice AI assistant</li>
-            <li><span>✓</span> Email & calendar automation</li>
-            <li><span>✓</span> Job application system</li>
-            <li><span>✓</span> CV optimisation per role</li>
-            <li><span>✓</span> 5,000 AI actions / month</li>
-          </ul>
-          <button class="price-btn out">Get Started</button>
-        </div>
-        <div class="price-card pop reveal">
-          <div class="pop-badge">MOST POPULAR</div>
-          <div class="price-name lt mt">Elite</div>
-          <div class="price-amt lt">$499</div>
-          <div class="price-per lt">Per Month</div>
-          <ul class="price-feats">
-            <li class="lt"><span>✓</span> Everything in Pro</li>
-            <li class="lt"><span>✓</span> Finance & crypto vault</li>
-            <li class="lt"><span>✓</span> Wallet monitoring & alerts</li>
-            <li class="lt"><span>✓</span> Unlimited AI actions</li>
-            <li class="lt"><span>✓</span> Priority support</li>
-          </ul>
-          <button class="price-btn fill">Get Started</button>
+      <div class="chat">
+        <div class="msg me"><div class="bubble" id="typed">I spent £85 at Waitrose and need to invoice Sarah at Creative Agency £2,500 for the logo project<span class="caret" id="caret"></span></div></div>
+        <div class="msg at" id="reply">
+          <div class="atlas-mark" style="width:22px;height:22px;font-size:9px">A</div>
+          <div class="bubble">
+            ✓ Logged the £85 Waitrose expense.<br>
+            ✓ Saved Sarah — Creative Agency, client.<br>
+            – Invoice for £2,500 is ready to raise whenever you say.
+            <div class="chips">
+              <span class="chip live"><span class="led"></span>Finance</span>
+              <span class="chip live"><span class="led"></span>Contacts</span>
+              <span class="chip live"><span class="led"></span>Invoice</span>
+            </div>
+            <div class="saved">Written to your account: <b>1 expense · 1 contact · 1 task</b></div>
+          </div>
         </div>
       </div>
     </div>
   </div>
-  <div id="cta-section">
-    <div class="cta-inner">
-      <p class="cta-pre reveal">Good morning.</p>
-      <h2 class="cta-h reveal">Your day is already<br><strong>taken care of.</strong></h2>
-      <p class="cta-sub reveal">Join the waitlist. Be first when Atlas launches.</p>
-      <div class="cta-btns reveal">
-        <button class="btn-d gold-btn" onclick="atlasWaitlist()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-          Join Free Waitlist
-        </button>
-        <button class="btn-o">View Pricing</button>
+</section>
+
+<!-- ═══ HONESTY ════════════════════════════════════════════════════════════ -->
+<section id="honesty" style="background:var(--paper-2)">
+  <div class="wrap">
+    <div style="max-width:680px">
+      <div class="eyebrow rv">What's actually connected</div>
+      <h2 class="rv">Ten agents work today.<br><em>Ten don't. We say which.</em></h2>
+      <p class="lead rv" style="margin-top:22px">
+        Every other assistant answers "done!" and hopes you don't check. Atlas shows you
+        its wiring. This panel is pulled live from the running product — not a graphic.
+      </p>
+    </div>
+    <div class="agents rv" id="agentGrid"></div>
+    <div class="legend rv">
+      <span><i class="swatch" style="background:var(--green)"></i> Connected and doing real work</span>
+      <span><i class="swatch" style="background:var(--ink-12)"></i> Not built yet — Atlas will say so</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CAPTURE ════════════════════════════════════════════════════════════ -->
+<section id="capture">
+  <div class="wrap split">
+    <div class="copy">
+      <div class="eyebrow rv">One sentence in</div>
+      <h2 class="rv">You talk.<br><em>It files itself.</em></h2>
+      <p class="lead rv" style="margin-top:22px">
+        No forms, no categories, no tagging. Mention a spend, a person or a deadline in
+        passing and it lands in the right place before Atlas has finished replying.
+      </p>
+    </div>
+    <div class="panel rv">
+      <div class="panel-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="panel-title">Dashboard</span></div>
+      <div class="dash">
+        <div class="cell">
+          <div class="cell-l">Expenses</div>
+          <div class="row"><span>Waitrose</span><span class="new-flag">new</span><span class="amt" style="margin-left:12px">£85</span></div>
+          <div class="row"><span>Pret</span><span class="amt">£12</span></div>
+          <div class="row"><span>Taxi</span><span class="amt">£19</span></div>
+        </div>
+        <div class="cell">
+          <div class="cell-l">Contacts</div>
+          <div class="row"><div><div>Sarah Whitfield</div><div class="sub">Creative Agency · client</div></div><span class="new-flag">new</span></div>
+          <div class="row"><div><div>Marcus Bell</div><div class="sub">Northgate Studios</div></div></div>
+        </div>
+        <div class="cell">
+          <div class="cell-l">Tasks</div>
+          <div class="row"><span class="tick"></span><span>Invoice Sarah — logo project</span><span class="new-flag">new</span></div>
+          <div class="row"><span class="tick"></span><span>Prep Thursday interview</span></div>
+        </div>
+        <div class="cell">
+          <div class="cell-l">Invoices</div>
+          <div class="row"><span>Creative Agency</span><span class="amt">£2,500</span></div>
+          <div class="row"><span class="sub">Draft — awaiting your approval</span></div>
+        </div>
       </div>
     </div>
   </div>
-  <div id="bottom">
-    <p class="bottom-label">Trusted by future-focused people</p>
-    <div class="bottom-grid">
-      <div class="bottom-item"><div class="bottom-icon">🎓</div><div class="bottom-name">Students</div></div>
-      <div class="bottom-item"><div class="bottom-icon">💼</div><div class="bottom-name">Founders</div></div>
-      <div class="bottom-item"><div class="bottom-icon">📈</div><div class="bottom-name">Traders</div></div>
-      <div class="bottom-item"><div class="bottom-icon">👔</div><div class="bottom-name">Executives</div></div>
-      <div class="bottom-item"><div class="bottom-icon">🍽️</div><div class="bottom-name">Restaurant</div></div>
-      <div class="bottom-item"><div class="bottom-icon">✨</div><div class="bottom-name">Creators</div></div>
+</section>
+
+<!-- ═══ JOBS ═══════════════════════════════════════════════════════════════ -->
+<section id="jobs" style="background:var(--paper-2)">
+  <div class="wrap split flip">
+    <div class="panel rv">
+      <div class="panel-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="panel-title">Application package</span></div>
+      <div class="jobs-grid">
+        <div class="score">
+          <div class="score-n">82<span style="font-size:24px">%</span></div>
+          <div class="score-l">Apply</div>
+        </div>
+        <div class="gaps">
+          <div>
+            <h4 style="color:var(--green)">Strengths</h4>
+            <ul>
+              <li><span style="color:var(--green)">+</span> Production LLM systems</li>
+              <li><span style="color:var(--green)">+</span> Full-stack, ships alone</li>
+              <li><span style="color:var(--green)">+</span> London-based</li>
+            </ul>
+          </div>
+          <div>
+            <h4 style="color:#a33">Gaps</h4>
+            <ul>
+              <li><span style="color:#a33">−</span> No formal MLOps</li>
+              <li><span style="color:#a33">−</span> Kubernetes not evidenced</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="docs">
+        <div class="doc">
+          <div class="cell-l">Tailored CV</div>
+          <pre>PERSONAL STATEMENT
+AI graduate who ships production systems end
+to end. Built and deployed an autonomous
+multi-agent assistant handling email, finance
+and job automation for real users.</pre>
+        </div>
+        <div class="doc">
+          <div class="cell-l">Cover letter</div>
+          <pre>I've spent the last year building the thing
+your job description describes — an agent
+system that has to be right about money and
+honest when it isn't sure.</pre>
+        </div>
+      </div>
     </div>
-    <div class="bottom-footer">© 2026 Atlas AI · Built by Ouail Abed · All Rights Reserved</div>
+    <div class="copy">
+      <div class="eyebrow rv">Job search</div>
+      <h2 class="rv">A tailored CV<br><em>per application.</em></h2>
+      <p class="lead rv" style="margin-top:22px">
+        Paste a job description. Atlas rewrites your CV against it, drafts the cover letter,
+        and scores your honest fit — including the gaps, so you know what you're walking into.
+      </p>
+      <p class="rv" style="margin-top:16px;font-size:15px;color:var(--ink-45)">
+        It never submits anything on your behalf. Every draft waits for you.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ STATS ══════════════════════════════════════════════════════════════ -->
+<section id="stats">
+  <div class="wrap stats-grid">
+    <div class="rv"><div class="stat-n" id="statAgents">10</div><div class="stat-l">Agents working</div></div>
+    <div class="rv"><div class="stat-n">2–4h</div><div class="stat-l">Saved daily</div></div>
+    <div class="rv"><div class="stat-n">£299</div><div class="stat-l">From, per month</div></div>
+    <div class="rv"><div class="stat-n">24/7</div><div class="stat-l">Always on</div></div>
+  </div>
+</section>
+
+<!-- ═══ PRICING ════════════════════════════════════════════════════════════ -->
+<section id="pricing">
+  <div class="wrap" style="text-align:center">
+    <div class="eyebrow rv">Pricing</div>
+    <h2 class="rv">Less than an assistant.<br><em>More than a tool.</em></h2>
+  </div>
+  <div class="wrap price-grid">
+    <div class="price-card rv">
+      <div class="price-name">Pro</div>
+      <div class="price-amt">£299</div>
+      <div class="price-per">per month</div>
+      <ul class="price-feats">
+        <li><i>✓</i> Unlimited messages</li>
+        <li><i>✓</i> All ten connected agents</li>
+        <li><i>✓</i> Email &amp; calendar once linked</li>
+        <li><i>✓</i> Job applications &amp; CV tailoring</li>
+        <li><i>✓</i> Daily morning briefing</li>
+      </ul>
+      <button class="btn btn-ghost price-btn" onclick="openWL()">Get started</button>
+    </div>
+    <div class="price-card pop rv">
+      <div class="pop-badge">MOST POPULAR</div>
+      <div class="price-name">Elite</div>
+      <div class="price-amt">£499</div>
+      <div class="price-per">per month</div>
+      <ul class="price-feats">
+        <li><i>✓</i> Everything in Pro</li>
+        <li><i>✓</i> Priority response</li>
+        <li><i>✓</i> Finance &amp; invoice automation</li>
+        <li><i>✓</i> Early access to new agents</li>
+        <li><i>✓</i> Direct line to the founder</li>
+      </ul>
+      <button class="btn btn-primary price-btn" style="background:var(--gold-bright);color:#14120f" onclick="openWL()">Get started</button>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CTA ════════════════════════════════════════════════════════════════ -->
+<section id="cta">
+  <div class="wrap">
+    <div class="eyebrow rv">Good morning</div>
+    <h2 class="rv" style="margin-bottom:22px">Your day is already<br><em>taken care of.</em></h2>
+    <p class="lead rv" style="text-align:center">Join the waitlist and be first when the next agents land.</p>
+    <div class="rv" style="margin-top:34px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+      <button class="btn" style="background:var(--gold-bright);color:#14120f" onclick="openWL()">Join the waitlist</button>
+      <a href="/atlas" class="btn btn-ghost" style="border-color:rgba(247,244,239,.25);color:rgba(247,244,239,.8)">Try it now</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-row">
+    <span>© 2026 Atlas · Built by Ouail Abed</span>
+    <span>London, UK</span>
+  </div>
+</footer>
+
+<div id="wl" onclick="if(event.target===this)closeWL()">
+  <div class="wl-card">
+    <h3 style="margin-bottom:8px">Join the waitlist</h3>
+    <p style="font-size:14px;color:var(--ink-45);margin-bottom:22px">We'll email you when spots open.</p>
+    <input id="wlEmail" class="wl-in" type="email" placeholder="your@email.com" autocomplete="email">
+    <p id="wlMsg" style="min-height:20px;font-size:13px;margin-top:11px;color:var(--gold)"></p>
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeWL()">Cancel</button>
+      <button class="btn btn-primary" style="flex:2;justify-content:center" id="wlGo">Join</button>
+    </div>
   </div>
 </div>
 
 <script>
-// ── CURSOR ────────────────────────────────────────────────────────────────────
-const cur=document.getElementById('cur'),ring=document.getElementById('cur-ring');
-let cx=0,cy=0,rx=0,ry=0;
-document.addEventListener('mousemove',e=>{cx=e.clientX;cy=e.clientY;cur.style.left=cx+'px';cur.style.top=cy+'px';});
-(function ar(){rx+=(cx-rx)*0.1;ry+=(cy-ry)*0.1;ring.style.left=rx+'px';ring.style.top=ry+'px';requestAnimationFrame(ar);})();
-
-// ── CANVAS ────────────────────────────────────────────────────────────────────
-const canvas=document.getElementById('c');
-const ctx=canvas.getContext('2d');
-let W,H;
-function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
-window.addEventListener('resize',resize);resize();
-
-// ── LERP ──────────────────────────────────────────────────────────────────────
-function lerp(a,b,t){return a+(b-a)*t;}
-
-// ── PARTICLES ────────────────────────────────────────────────────────────────
-const N=2500;
-const px=new Float32Array(N),py=new Float32Array(N);
-const pvx=new Float32Array(N),pvy=new Float32Array(N);
-const pr=new Float32Array(N),pop=new Float32Array(N);
-const ptx=new Float32Array(N),pty=new Float32Array(N);
-const pcol=new Uint8Array(N);
-for(let i=0;i<N;i++){
-  px[i]=Math.random()*2000; py[i]=Math.random()*1200;
-  pvx[i]=(Math.random()-.5)*0.4; pvy[i]=(Math.random()-.5)*0.4;
-  pr[i]=Math.random()*1.5+0.5; pop[i]=Math.random()*0.5+0.1;
-  ptx[i]=px[i]; pty[i]=py[i];
-  pcol[i]=Math.floor(Math.random()*3);
-}
-
-// ── SCROLL STATE ──────────────────────────────────────────────────────────────
-let scrollY=0,lerpScroll=0,lastScene=-1,time=0;
-const SCENES=7;
-const DRIVER_H=()=>document.getElementById('scroll-driver').offsetHeight;
-
-window.addEventListener('scroll',()=>{
-  scrollY=window.scrollY;
-  document.getElementById('scroll-ind').style.opacity=scrollY>100?'0':'1';
+/* ── reveal on scroll ─────────────────────────────────────────────────────── */
+var io=new IntersectionObserver(function(es){
+  es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+},{threshold:.12,rootMargin:'0px 0px -8% 0px'});
+document.querySelectorAll('.rv').forEach(function(el,i){
+  el.style.transitionDelay=(Math.min(i,6)*55)+'ms';
+  io.observe(el);
 });
 
-// ── SCENE TARGETS ────────────────────────────────────────────────────────────
-function setOrbital(){
-  const cx=W*0.6,cy=H*0.5;
-  const radii=[0,W*0.12,W*0.2,W*0.28,W*0.36,W*0.44];
-  let idx=0;
-  radii.forEach((r,ri)=>{
-    const count=ri===0?50:Math.floor((N-50)/5);
-    for(let i=0;i<count&&idx<N;i++,idx++){
-      if(r===0){ptx[idx]=cx+(Math.random()-.5)*20;pty[idx]=cy+(Math.random()-.5)*20;}
-      else{const a=(i/count)*Math.PI*2;ptx[idx]=cx+Math.cos(a)*(r+(Math.random()-.5)*15);pty[idx]=cy+Math.sin(a)*(r+(Math.random()-.5)*15);}
-      pcol[idx]=ri%2===0?0:1;
-    }
+/* Anything already in the first viewport is revealed straight away rather than
+   waiting on the observer. Above the fold, an observer round-trip means the
+   hero is blank for the best part of a second on load — which is exactly the
+   "page looks broken" failure this rebuild set out to remove. */
+requestAnimationFrame(function(){
+  document.querySelectorAll('.rv').forEach(function(el){
+    if(el.getBoundingClientRect().top < innerHeight){ el.classList.add('in'); io.unobserve(el); }
   });
-}
+});
 
-function setStream(){
-  for(let i=0;i<N;i++){
-    const row=Math.floor(i/(N/8));
-    const col=(i%(N/8))/(N/8);
-    ptx[i]=col*W;
-    pty[i]=H*0.1+row*(H/8)+Math.sin(col*Math.PI*4)*30;
-    pcol[i]=i%3===0?0:1;
-  }
-}
+/* Last-resort safety net: nothing stays invisible, whatever happens above. */
+setTimeout(function(){
+  document.querySelectorAll('.rv:not(.in)').forEach(function(el){
+    if(el.getBoundingClientRect().top < innerHeight*1.5) el.classList.add('in');
+  });
+},2500);
 
-function setNeural(){
-  const layers=[3,5,7,5,3];
-  const totalNodes=layers.reduce((a,b)=>a+b,0);
-  const perNode=Math.floor(N/totalNodes);
-  let idx=0;
-  layers.forEach((cnt,li)=>{
-    const lx=W*(0.15+li*0.17);
-    for(let n=0;n<cnt;n++){
-      const ny=H/(cnt+1)*(n+1);
-      for(let p=0;p<perNode&&idx<N;p++,idx++){
-        ptx[idx]=lx+(Math.random()-.5)*20;
-        pty[idx]=ny+(Math.random()-.5)*20;
-        pcol[idx]=n%2===0?0:1;
+addEventListener('scroll',function(){
+  document.getElementById('nav').classList.toggle('stuck', scrollY>12);
+},{passive:true});
+
+/* ── hero: type the message, then reveal the reply ────────────────────────
+   The full text ships in the DOM. This only re-reveals it, so with reduced
+   motion — or if this script never runs — the message is simply there. */
+(function typeHero(){
+  var el=document.getElementById('typed'),
+      caret=document.getElementById('caret'),
+      reply=document.getElementById('reply'),
+      panel=document.getElementById('chatPanel');
+  if(!el||!reply||!panel) return;
+
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches){ if(caret) caret.remove(); return; }
+
+  var full=el.childNodes[0].nodeValue;
+  reply.style.opacity=0;
+
+  var started=false;
+  function start(){
+    if(started) return; started=true;
+    el.childNodes[0].nodeValue='';
+    var i=0;
+    (function tick(){
+      el.childNodes[0].nodeValue=full.slice(0,++i);
+      if(i<full.length) setTimeout(tick, 16+Math.random()*26);
+      else{
+        if(caret) caret.remove();
+        setTimeout(function(){
+          reply.style.transition='opacity .6s ease, transform .6s cubic-bezier(.16,1,.3,1)';
+          reply.style.transform='translateY(10px)';
+          requestAnimationFrame(function(){ reply.style.opacity=1; reply.style.transform='none'; });
+        },420);
       }
-    }
-  });
-}
-
-function setGlobe(){
-  const cx=W/2,cy=H/2,r=Math.min(W,H)*0.36;
-  for(let i=0;i<N;i++){
-    const phi=Math.acos(1-2*(i+0.5)/N);
-    const theta=Math.PI*(1+Math.sqrt(5))*(i+0.5);
-    ptx[i]=cx+r*Math.sin(phi)*Math.cos(theta);
-    pty[i]=cy+r*Math.cos(phi)*0.6;
-    pcol[i]=i%5===0?0:1;
+    })();
   }
-}
 
-function setGalaxy(){
-  const cx=W/2,cy=H/2;
-  for(let i=0;i<N;i++){
-    const arm=i%5;
-    const t=(i/N)*5;
-    const r=t*Math.min(W,H)*0.42;
-    const angle=(arm/5)*Math.PI*2+t*1.8+(Math.random()-.5)*0.4;
-    const spread=(Math.random()-.5)*r*0.18;
-    ptx[i]=cx+Math.cos(angle)*(r+spread);
-    pty[i]=cy+Math.sin(angle)*(r+spread)*0.55;
-    pcol[i]=arm;
-  }
-}
+  // Safety net: if the observer never fires, show everything anyway.
+  var bail=setTimeout(function(){ started=true; el.childNodes[0].nodeValue=full; if(caret)caret.remove(); reply.style.opacity=1; },6000);
 
-function setCTA(){
-  const cx=W/2,cy=H/2;
-  for(let i=0;i<N;i++){
-    const a=(i/N)*Math.PI*2;
-    const r=30+Math.random()*60;
-    ptx[i]=cx+Math.cos(a)*r;
-    pty[i]=cy+Math.sin(a)*r;
-    pcol[i]=0;
-  }
-}
-
-// ── SCENE OVERLAY MANAGEMENT ──────────────────────────────────────────────────
-function updateOverlays(scene,prog){
-  for(let i=0;i<SCENES;i++){
-    const el=document.getElementById('sc'+(i+1));
-    if(!el)continue;
-    let op=0;
-    if(i===scene){
-      // Scene 0 at scroll 0 used to compute prog/0.15 = 0, so the hero copy was
-      // invisible until you scrolled and the page looked empty. The first scene
-      // is fully visible at rest; CSS handles its entrance.
-      if(prog>0.82) op=1-(prog-0.82)/0.18;
-      else if(scene===0) op=1;
-      else if(prog<0.15) op=prog/0.15;
-      else op=1;
-    }
-    el.style.opacity=op;
-  }
-  // Nav
-  const nav=document.getElementById('nav');
-  nav.className=scene===0&&prog<0.5?'light':'dark';
-  // Sidenav
-  document.querySelectorAll('.sni').forEach((s,i)=>s.classList.toggle('on',i===scene));
-}
-
-// ── TRAIL SYSTEM for orbital ──────────────────────────────────────────────────
-const trailLen=8;
-const orbTrails=[];
-for(let i=0;i<5;i++){
-  // k is the perspective scale the 3D orbital renderer multiplies by. Seeding
-  // without it produced NaN radii for the first `trailLen` frames.
-  orbTrails.push(Array.from({length:trailLen},()=>({x:0,y:0,k:0})));
-}
-
-// ── NEURAL NODE POSITIONS ─────────────────────────────────────────────────────
-let neuralNodes=[];
-function buildNeural(){
-  neuralNodes=[];
-  const layers=[3,5,7,5,3];
-  layers.forEach((cnt,li)=>{
-    const lx=W*(0.15+li*0.17);
-    for(let n=0;n<cnt;n++){
-      neuralNodes.push({x:lx,y:H/(cnt+1)*(n+1),li,bright:0});
-    }
-  });
-}
-
-// ── TASK CARDS ────────────────────────────────────────────────────────────────
-const taskCards=[
-  '✓  Email replies sent — 3 emails',
-  '✓  Meeting booked — Tuesday 2PM',
-  '✓  CV submitted — DeepMind London',
-  '✓  Invoice sent — £3,200 to client',
-  '✓  Report generated — Q2 summary',
-  '✓  Interview scheduled — Thursday 10AM',
-];
-// Card appears when scene3 local progress hits these values
-const cardTriggers=[0.1,0.25,0.4,0.55,0.7,0.85];
-
-// ── DRAW ──────────────────────────────────────────────────────────────────────
-// ── FRAME SEQUENCES ──────────────────────────────────────────────────────────
-// Two chained shots of generated footage, scrubbed against scroll rather than
-// played on their own clock:
-//   scene 0  hero-seq  camera orbits the sphere at distance
-//   scene 1  seq-b     camera keeps orbiting while descending toward the figure
-//
-// Both were cropped to the same 2.182 aspect so the last frame of A and the
-// first frame of B frame identically — the cut between scenes is invisible.
-//
-// Sequence A loads immediately; B starts only once A is complete, so the
-// initial page load is unchanged and B is ready long before anyone scrolls to
-// it. If a sequence fails to load, `ready` never flips and that scene falls
-// back to the canvas visuals it had before.
-const SEQS=[
-  { scene:0, dir:'hero-seq', n:72, imgs:[], loaded:0, ready:false, failed:false, last:-1 },
-  { scene:1, dir:'seq-b',    n:72, imgs:[], loaded:0, ready:false, failed:false, last:-1 },
-];
-
-const heroCanvas=document.getElementById('heroSeq');
-const heroCtx=heroCanvas.getContext('2d');
-
-function loadSeq(seq,onDone){
-  for(let i=1;i<=seq.n;i++){
-    const im=new Image();
-    im.decoding='async';
-    im.onload=()=>{
-      if(++seq.loaded===seq.n){
-        seq.ready=true;
-        if(seq.scene===0){
-          heroCanvas.style.opacity='1';
-          const hi=document.getElementById('hero-img');
-          if(hi) hi.style.opacity='0';
-        }
-        if(onDone) onDone();
-      }
-    };
-    im.onerror=()=>{ seq.failed=true; };
-    im.src=seq.dir+'/f_'+String(i).padStart(3,'0')+'.webp';
-    seq.imgs.push(im);
-  }
-}
-// A first, then B in the background.
-loadSeq(SEQS[0],()=>loadSeq(SEQS[1]));
-
-function activeSeqExists(scene){ return SEQS.some(q=>q.scene===scene&&q.ready); }
-function activeSeq(scene){
-  for(const q of SEQS) if(q.scene===scene && q.ready) return q;
-  return null;
-}
-
-function sizeHeroCanvas(){
-  const r=heroCanvas.getBoundingClientRect();
-  const dpr=Math.min(window.devicePixelRatio||1,2);
-  heroCanvas.width=Math.max(1,Math.round(r.width*dpr));
-  heroCanvas.height=Math.max(1,Math.round(r.height*dpr));
-  SEQS.forEach(q=>q.last=-1);          // bitmap resize wipes the canvas
-}
-window.addEventListener('resize',sizeHeroCanvas);
-sizeHeroCanvas();
-
-// Cover-fit, and redraw only when the frame index actually changes. The
-// scrubber advances roughly one frame per 1.6vh of scroll, so without this
-// gate the great majority of calls re-upscale an identical image.
-function drawSeqFrame(seq,idx){
-  const im=seq.imgs[idx];
-  if(!im||!im.complete||!im.naturalWidth) return;
-  if(idx===seq.last && heroCanvas.width===seq.lw && heroCanvas.height===seq.lh) return;
-  seq.last=idx; seq.lw=heroCanvas.width; seq.lh=heroCanvas.height;
-
-  const cw=heroCanvas.width, ch=heroCanvas.height;
-  if(!cw||!ch) return;
-  const ar=im.naturalWidth/im.naturalHeight, boxAr=cw/ch;
-  let dw,dh;
-  if(ar>boxAr){ dh=ch; dw=ch*ar; } else { dw=cw; dh=cw/ar; }
-  heroCtx.clearRect(0,0,cw,ch);
-  heroCtx.drawImage(im,(cw-dw)/2,(ch-dh)/2,dw,dh);
-}
-
-// ── HERO ORBIT SHELL ─────────────────────────────────────────────────────────
-// A shell of points on a sphere, distributed with the Fibonacci spiral so they
-// are evenly spaced rather than bunched at the poles. The hero art is a flat
-// photograph and cannot truly be orbited, but rotating a real 3D shell around
-// the sphere in the artwork produces genuine parallax — near points sweep across
-// faster and brighter than far ones — which is what reads as camera movement.
-const SHELL_N=260, shellPts=[];
-(function buildShell(){
-  const golden=Math.PI*(3-Math.sqrt(5));
-  for(let i=0;i<SHELL_N;i++){
-    const y=1-(i/(SHELL_N-1))*2;
-    const rad=Math.sqrt(Math.max(0,1-y*y));
-    const th=golden*i;
-    shellPts.push({x:Math.cos(th)*rad, y, z:Math.sin(th)*rad, s:Math.random()*0.6+0.4});
-  }
+  new IntersectionObserver(function(es,o){
+    es.forEach(function(e){ if(e.isIntersecting){ clearTimeout(bail); setTimeout(start,600); o.disconnect(); } });
+  },{threshold:.35}).observe(panel);
 })();
 
-let lastFrameT=performance.now();
-function draw(){
-  requestAnimationFrame(draw);
+/* ── agent grid, from the live API ────────────────────────────────────────
+   Renders the shipped roster immediately, then upgrades to live data. The
+   section is never empty, even offline. */
+(function agents(){
+  var grid=document.getElementById('agentGrid');
+  if(!grid) return;
 
-  // Frames elapsed since the last paint, capped so returning from a background
-  // tab does not teleport the scene. The old code advanced by a fixed amount
-  // per frame, so everything ran ~2.4x faster on a 144Hz display than on 60Hz —
-  // which is a large part of why the scroll felt inconsistent.
-  const nowT=performance.now();
-  const dt=Math.min((nowT-lastFrameT)/16.667,4);
-  lastFrameT=nowT;
-  time+=0.01*dt;
-
-  // Exponential damping toward the real scroll position. Expressed this way the
-  // easing is identical at any refresh rate.
-  lerpScroll+=(scrollY-lerpScroll)*(1-Math.pow(1-0.085,dt));
-  const dh=DRIVER_H()||1;
-  const gp=Math.min(1,lerpScroll/dh);
-  const rawScene=gp*SCENES;
-  const scene=Math.min(SCENES-1,Math.floor(rawScene));
-  const prog=rawScene-scene;
-
-  // Set particle targets on scene change
-  if(scene!==lastScene){
-    lastScene=scene;
-    if(scene===1)setOrbital();
-    else if(scene===2)setStream();
-    else if(scene===3){setNeural();buildNeural();}
-    else if(scene===4)setGlobe();
-    else if(scene===5)setGalaxy();
-    else if(scene===6)setCTA();
-  }
-
-  // ── HERO ZOOM (scene 0) ───────────────────────────────────────────────────
-  const heroImg=document.getElementById('hero-img');
-  // Footage for this scene, if its sequence has finished loading.
-  const seq=activeSeq(scene);
-
-  if(seq){
-    // The camera move lives in the frames, so the transform is only a gentle
-    // push-in. Re-applying the old lateral drift and roll would double the
-    // movement and read as a wobble.
-    drawSeqFrame(seq,Math.min(seq.n-1,Math.round(prog*(seq.n-1))));
-    heroCanvas.style.transform=`scale(${lerp(1.0,1.06,prog)})`;
-    // Only the last scene of footage fades out; between A and B the cut is
-    // continuous, so fading there would blink mid-move.
-    const isLastSeq=!activeSeqExists(scene+1);
-    heroCanvas.style.opacity=(isLastSeq&&prog>0.72)?lerp(1,0,(prog-0.72)/0.28):1;
-    heroImg.style.opacity='0';
-  } else if(scene===0){
-    // Fallback: the original CSS-driven camera arc on the still hero image.
-    const zoomProg=Math.min(1,gp/(0.14*0.43));
-    const scale=lerp(1.02,1.24,zoomProg);
-    const arc=lerp(-2.2,2.2,prog);
-    const roll=lerp(-0.55,0.55,prog);
-    heroImg.style.transform=`translate3d(${arc}%,${-arc*0.14}%,0) rotate(${roll}deg) scale(${scale})`;
-    heroImg.style.opacity=prog>0.7?lerp(1,0,(prog-0.7)/0.3):1;
-    heroCanvas.style.opacity='0';
-  } else {
-    heroImg.style.opacity='0';
-    heroImg.style.transform='scale(1.18)';
-    heroCanvas.style.opacity='0';
-  }
-
-  // ── BACKGROUND ────────────────────────────────────────────────────────────
-  ctx.clearRect(0,0,W,H);
-  // #c sits above the footage canvas, so an opaque wash here would hide it.
-  // Scenes backed by footage get no wash at all; the last one darkens on exit
-  // to hand over to the canvas scenes that follow.
-  if(seq){
-    if(!activeSeqExists(scene+1) && prog>0.72){
-      ctx.fillStyle=`rgba(5,4,3,${(prog-0.72)/0.28*0.9})`;
-      ctx.fillRect(0,0,W,H);
-    }
-  } else if(scene===0){
-    const darkProg=prog>0.7?(prog-0.7)/0.3:0;
-    ctx.fillStyle=`rgba(5,4,3,${darkProg*0.9})`;
-    ctx.fillRect(0,0,W,H);
-  } else {
-    ctx.fillStyle='rgba(5,4,3,0.94)';
-    ctx.fillRect(0,0,W,H);
-  }
-
-  // ── MOVE PARTICLES ────────────────────────────────────────────────────────
-  const spd=scene===0?0.001:0.05;
-  for(let i=0;i<N;i++){
-    if(scene===0){
-      px[i]+=pvx[i]; py[i]+=pvy[i];
-      if(px[i]<0)px[i]=W; if(px[i]>W)px[i]=0;
-      if(py[i]<0)py[i]=H; if(py[i]>H)py[i]=0;
-    } else {
-      px[i]=lerp(px[i],ptx[i],spd);
-      py[i]=lerp(py[i],pty[i],spd);
-    }
-    // Stream scene — flow left to right
-    if(scene===2){px[i]+=0.8+prog*2;if(px[i]>W+50)px[i]=-50;}
-    // Globe — slow rotation
-    if(scene===4){
-      const dx=px[i]-W/2,dy=py[i]-H/2;
-      const ang=Math.atan2(dy,dx)+0.003;
-      const r2=Math.sqrt(dx*dx+dy*dy);
-      px[i]=W/2+Math.cos(ang)*r2;
-      py[i]=H/2+Math.sin(ang)*r2;
-    }
-    // Galaxy — slow rotation
-    if(scene===5){
-      const dx=px[i]-W/2,dy=py[i]-H/2;
-      const ang=Math.atan2(dy,dx)+0.0012;
-      const r2=Math.sqrt(dx*dx+dy*dy);
-      px[i]=W/2+Math.cos(ang)*r2;
-      py[i]=H/2+Math.sin(ang)*r2;
-    }
-  }
-
-  // ── DRAW PARTICLES ────────────────────────────────────────────────────────
-  // Batched into Path2D buckets by colour and quantised alpha.
-  //
-  // The previous version ran beginPath + arc + a template-string fillStyle +
-  // fill for each of the 2500 particles, every frame: 2500 string allocations
-  // and 2500 canvas state changes. That was the single biggest cost in the
-  // frame and the main reason scrolling felt heavy. One pass over the particles
-  // plus at most 5 x 6 fills replaces it, with no visible difference.
-  const colors=[
-    [201,168,76],[240,236,230],[180,160,120],[220,200,140],[255,245,200]
+  var FALLBACK_LIVE=['Memory','Tasks','Research','Finance','Jobs','News','Writing','Coach','Contacts','Invoice'];
+  var FALLBACK_PLANNED=[
+    ['Email','needs connecting'],['Calendar','needs connecting'],
+    ['WhatsApp','WhatsApp Business API'],['Travel','a booking provider'],
+    ['Trading','a brokerage API'],['Health','Apple Health or Google Fit'],
+    ['Shopping','a retail price API'],['Legal','document tooling'],
+    ['Social','LinkedIn or X API'],['Code','a repo connection']
   ];
-  const A_STEPS=6;
-  const baseOp=(scene===0||seq)?0.25:0.65;   // footage is pale; heavy particles muddy it
-  const buckets=new Array(colors.length*A_STEPS);
 
-  for(let i=0;i<N;i++){
-    if(px[i]<-5||px[i]>W+5||py[i]<-5||py[i]>H+5)continue;
-    const c=pcol[i]<4?pcol[i]:4;
-    // pop[i] spans 0.1..0.6; map it across the alpha buckets.
-    let a=Math.round((pop[i]-0.1)/0.5*(A_STEPS-1));
-    if(a<0)a=0; else if(a>A_STEPS-1)a=A_STEPS-1;
-    const k=c*A_STEPS+a;
-    let path=buckets[k];
-    if(path===undefined)path=buckets[k]=new Path2D();
-    const sz=pr[i]<1?1:(pr[i]>2.5?2.5:pr[i]);
-    // moveTo before arc, or Path2D joins each circle to the previous one.
-    path.moveTo(px[i]+sz,py[i]);
-    path.arc(px[i],py[i],sz,0,Math.PI*2);
+  function esc(s){ return String(s).replace(/[&<>"]/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+  function render(live,planned){
+    grid.innerHTML =
+      live.map(function(n){
+        return '<div class="agent on"><span class="led"></span><span class="name">'+esc(n)+'</span></div>';
+      }).join('') +
+      planned.map(function(p){
+        return '<div class="agent off"><span class="led"></span><span class="name">'+esc(p[0])+
+               '</span><span class="needs">'+esc(p[1]||'')+'</span></div>';
+      }).join('');
+    var s=document.getElementById('statAgents'); if(s) s.textContent=live.length;
+    var n=document.getElementById('navCount'); if(n) n.textContent=live.length+' agents connected';
   }
 
-  for(let k=0;k<buckets.length;k++){
-    const path=buckets[k];
-    if(path===undefined)continue;
-    const [r,g,b]=colors[(k/A_STEPS)|0];
-    const op=(0.1+(k%A_STEPS)/(A_STEPS-1)*0.5)*baseOp;
-    ctx.fillStyle=`rgba(${r},${g},${b},${op})`;
-    ctx.fill(path);
-  }
+  render(FALLBACK_LIVE,FALLBACK_PLANNED);
 
-  // ── SCENE 1 — HERO ORBIT SHELL ───────────────────────────────────────────
-  if(scene===0 && !seq){          // the footage carries its own parallax
-    const sx=W*0.62, sy=H*0.46;                 // sphere centre within the art
-    const R=Math.min(W,H)*0.34;
-    const yaw=prog*1.9+time*0.05;               // scroll drives the orbit
-    const pitch=-0.20;
-    const cY=Math.cos(yaw),  sY=Math.sin(yaw);
-    const cP=Math.cos(pitch),sP=Math.sin(pitch);
-
-    // Fades in as the hero settles and out as the scene hands over, so it never
-    // fights the headline on arrival.
-    const shellAlpha=Math.min(1,prog/0.18)*(prog>0.62?Math.max(0,1-(prog-0.62)/0.28):1);
-
-    if(shellAlpha>0.01){
-      for(let i=0;i<SHELL_N;i++){
-        const q=shellPts[i];
-        const X=q.x*cY - q.z*sY;
-        let Z=q.x*sY + q.z*cY;
-        const Y=q.y*cP - Z*sP;
-        Z=q.y*sP + Z*cP;
-
-        // Z spans -1..1; map to a depth factor so the near face is larger,
-        // brighter and warmer than the far face.
-        const near=(Z+1)*0.5;
-        const px2=sx+X*R, py2=sy+Y*R;
-        if(px2<-20||px2>W+20||py2<-20||py2>H+20) continue;
-
-        const a=(0.05+near*0.42)*q.s*shellAlpha;
-        const rad=(0.5+near*1.9)*q.s;
-        ctx.beginPath();
-        ctx.arc(px2,py2,rad,0,Math.PI*2);
-        ctx.fillStyle=`rgba(${Math.round(190+near*60)},${Math.round(165+near*70)},${Math.round(110+near*80)},${a})`;
-        ctx.fill();
-      }
-    }
-  }
-
-  // ── SCENE 2 — ORBITAL (true 3D) ──────────────────────────────────────────
-  // Rebuilt from flat 2D circles to real perspective projection.
-  //
-  // Each orbit is a circle in 3D space with its own inclination, and the whole
-  // system is viewed through a camera whose yaw is driven by scroll — so
-  // scrolling through this scene physically swings the camera around the
-  // system. Nodes scale and dim with depth and pass behind the core, which is
-  // what sells it as a space rather than a diagram.
-  if(scene===1 && !seq){          // footage replaces the canvas orbital when present
-    const cx=W*0.6, cy=H*0.5;
-    const radii=[W*0.12,W*0.2,W*0.28,W*0.36,W*0.44];
-    const labels=['Gmail','Calendar','Notion','Slack','Finance'];
-    const speeds=[0.5,0.38,0.28,0.2,0.14];
-    const tilts=[0.34,0.52,0.26,0.62,0.42];   // inclination per orbit, radians
-    const FOV=Math.max(W,H)*1.15;
-
-    // Camera. Scroll drives the swing; `time` adds a slow idle drift so the
-    // scene is never completely static when the reader stops moving.
-    const camYaw   = prog*1.25 + time*0.06;
-    const camPitch = -0.30 - prog*0.10;
-    const cosY=Math.cos(camYaw),  sinY=Math.sin(camYaw);
-    const cosP=Math.cos(camPitch),sinP=Math.sin(camPitch);
-
-    // World -> screen. Returns null for anything behind the camera plane.
-    function proj(x,y,z){
-      let X = x*cosY - z*sinY;
-      let Z = x*sinY + z*cosY;
-      const Y = y*cosP - Z*sinP;
-      Z = y*sinP + Z*cosP;
-      const d = Z + FOV;
-      if(d < 1) return null;
-      const k = FOV/d;
-      return { x: cx + X*k, y: cy + Y*k, k, d };
-    }
-
-    // A point on orbit i at angle a: circle in the XZ plane, tilted about X.
-    function orbitPoint(i,a){
-      const r=radii[i], t=tilts[i];
-      const ox=Math.cos(a)*r, oz=Math.sin(a)*r;
-      return proj(ox, -oz*Math.sin(t), oz*Math.cos(t));
-    }
-
-    const coreDepth = (proj(0,0,0)||{d:FOV}).d;
-
-    // ── rings ──────────────────────────────────────────────────────────────
-    // Drawn segment by segment so the far half can fade — a single stroked
-    // ellipse would read as flat no matter how it is projected.
-    const SEG=84;
-    for(let i=0;i<radii.length;i++){
-      let prev=null;
-      for(let sIdx=0;sIdx<=SEG;sIdx++){
-        const pt=orbitPoint(i, sIdx/SEG*Math.PI*2);
-        if(pt&&prev){
-          const behind=(pt.d+prev.d)*0.5 > coreDepth;
-          ctx.beginPath();
-          ctx.moveTo(prev.x,prev.y);
-          ctx.lineTo(pt.x,pt.y);
-          ctx.strokeStyle=`rgba(201,168,76,${behind?0.14:0.42})`;
-          ctx.lineWidth=behind?0.7:1.1;
-          ctx.stroke();
-        }
-        prev=pt;
-      }
-    }
-
-    // ── nodes, depth sorted ────────────────────────────────────────────────
-    const nodes=[];
-    for(let i=0;i<radii.length;i++){
-      const a=time*speeds[i];
-      const pt=orbitPoint(i,a);
-      if(!pt) continue;
-
-      const trail=orbTrails[i];
-      trail.unshift({x:pt.x,y:pt.y,k:pt.k});
-      if(trail.length>trailLen) trail.pop();
-
-      nodes.push({ i, pt, trail, label:labels[i] });
-    }
-    nodes.sort((a,b)=>b.pt.d-a.pt.d);   // far first
-
-    function drawNode(n){
-      const {pt,trail,label}=n;
-      // Depth fade: 1 at the front of the system, ~0.3 at the back.
-      const depthMix=Math.max(0,Math.min(1,(coreDepth*1.5-pt.d)/(coreDepth*0.9)));
-      const alpha=0.3+depthMix*0.7;
-
-      for(let ti=trail.length-1;ti>=0;ti--){
-        const t=trail[ti], f=1-ti/trailLen;
-        const rr=4*f*(t.k||0);
-        if(!(rr>0)) continue;              // skip unseeded / degenerate entries
-        ctx.beginPath();
-        ctx.arc(t.x,t.y,rr,0,Math.PI*2);
-        ctx.fillStyle=`rgba(201,168,76,${f*0.55*alpha})`;
-        ctx.fill();
-      }
-
-      const g=ctx.createRadialGradient(pt.x,pt.y,0,pt.x,pt.y,16*pt.k);
-      g.addColorStop(0,`rgba(201,168,76,${0.45*alpha})`);
-      g.addColorStop(1,'rgba(0,0,0,0)');
-      ctx.fillStyle=g;
-      ctx.beginPath();ctx.arc(pt.x,pt.y,16*pt.k,0,Math.PI*2);ctx.fill();
-
-      ctx.beginPath();ctx.arc(pt.x,pt.y,4.5*pt.k,0,Math.PI*2);
-      ctx.fillStyle=`rgba(235,215,150,${alpha})`;ctx.fill();
-
-      // Label rides with its node instead of sitting statically at the top.
-      ctx.fillStyle=`rgba(255,255,255,${0.22+depthMix*0.6})`;
-      ctx.font=`${Math.max(9,11*pt.k)}px Segoe UI`;
-      ctx.textAlign='center';ctx.textBaseline='bottom';
-      ctx.fillText(label, pt.x, pt.y-13*pt.k);
-    }
-
-    nodes.filter(n=>n.pt.d>coreDepth).forEach(drawNode);   // behind the core
-
-    // ── core ───────────────────────────────────────────────────────────────
-    const pulse=0.5+Math.sin(time*2)*0.5;
-    const cg=ctx.createRadialGradient(cx,cy,0,cx,cy,46+pulse*12);
-    cg.addColorStop(0,'rgba(201,168,76,0.42)');
-    cg.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=cg;
-    ctx.beginPath();ctx.arc(cx,cy,46+pulse*12,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc(cx,cy,12,0,Math.PI*2);
-    ctx.fillStyle='rgba(201,168,76,0.95)';ctx.fill();
-    ctx.fillStyle='rgba(26,26,26,0.9)';ctx.font='bold 10px Segoe UI';
-    ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText('ATLAS',cx,cy);
-
-    nodes.filter(n=>n.pt.d<=coreDepth).forEach(drawNode);  // in front of the core
-  }
-
-  // ── SCENE 3 — TASK CARDS ─────────────────────────────────────────────────
-  if(scene===2){
-    taskCards.forEach((card,i)=>{
-      const trigger=cardTriggers[i];
-      const next=cardTriggers[i+1]||1.1;
-      let op=0;
-      if(prog>=trigger&&prog<trigger+0.1) op=(prog-trigger)/0.1;
-      else if(prog>=trigger+0.1&&prog<next) op=1;
-      else if(prog>=next&&prog<next+0.1) op=1-(prog-next)/0.1;
-      if(op<=0)return;
-
-      const cardW=420,cardH=56;
-      const cardX=W-cardW-60+lerp(200,0,Math.min(1,(prog-trigger)/0.12));
-      const cardY=H*0.2+i*(cardH+14);
-
-      ctx.save();
-      ctx.globalAlpha=op;
-      // Card bg
-      ctx.beginPath();
-      if(ctx.roundRect) ctx.roundRect(cardX,cardY,cardW,cardH,10);
-      else ctx.rect(cardX,cardY,cardW,cardH);
-      ctx.fillStyle='rgba(10,8,6,0.85)';ctx.fill();
-      ctx.strokeStyle='rgba(240,236,230,0.08)';ctx.lineWidth=1;ctx.stroke();
-      // Gold left border
-      ctx.fillStyle='rgba(201,168,76,0.9)';
-      ctx.fillRect(cardX,cardY,3,cardH);
-      // Text
-      ctx.fillStyle='rgba(240,236,230,0.85)';
-      ctx.font='13px Segoe UI';ctx.textAlign='left';ctx.textBaseline='middle';
-      ctx.fillText(card,cardX+18,cardY+cardH/2);
-      ctx.restore();
-    });
-  }
-
-  // ── SCENE 4 — NEURAL ─────────────────────────────────────────────────────
-  if(scene===3&&neuralNodes.length>0){
-    // Connections
-    neuralNodes.forEach((a,ai)=>{
-      neuralNodes.forEach((b,bi)=>{
-        if(b.li!==a.li+1)return;
-        const pulse=0.5+Math.sin(time*1.5+ai*0.4)*0.5;
-        ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
-        ctx.strokeStyle=`rgba(201,168,76,${0.06+pulse*0.1})`;ctx.lineWidth=0.8;ctx.stroke();
-        // Traveling pulse
-        const tp=((time*0.6+ai*0.15)%1);
-        const px2=a.x+(b.x-a.x)*tp,py2=a.y+(b.y-a.y)*tp;
-        ctx.beginPath();ctx.arc(px2,py2,2.5,0,Math.PI*2);
-        ctx.fillStyle=`rgba(201,168,76,0.9)`;ctx.fill();
-      });
-    });
-    // Nodes
-    neuralNodes.forEach((n,i)=>{
-      const pulse=0.4+Math.sin(time*2+i*0.7)*0.6;
-      n.bright=lerp(n.bright,pulse,0.1);
-      const isCenter=n.li===2&&n.y===H/2||(n.li===2);
-      const r=isCenter?10:7;
-      // Glow
-      const grd=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,r*3);
-      grd.addColorStop(0,`rgba(201,168,76,${n.bright*0.3})`);
-      grd.addColorStop(1,'rgba(0,0,0,0)');
-      ctx.fillStyle=grd;ctx.beginPath();ctx.arc(n.x,n.y,r*3,0,Math.PI*2);ctx.fill();
-      // Node
-      ctx.beginPath();ctx.arc(n.x,n.y,r,0,Math.PI*2);
-      ctx.fillStyle=`rgba(201,168,76,${0.5+n.bright*0.4})`;ctx.fill();
-    });
-    // Center ATLAS label
-    const cx=W*0.15+2*W*0.17,cy=H/2;
-    ctx.fillStyle='rgba(240,236,230,0.8)';ctx.font='bold 11px Segoe UI';
-    ctx.textAlign='center';ctx.textBaseline='top';
-    ctx.fillText('ATLAS',cx,cy+14);
-  }
-
-  // ── SCENE 5 — GLOBE ──────────────────────────────────────────────────────
-  if(scene===4){
-    const cx=W/2,cy=H/2,r=Math.min(W,H)*0.36;
-    // Globe glow
-    const grd=ctx.createRadialGradient(cx,cy,r*0.3,cx,cy,r*1.4);
-    grd.addColorStop(0,'rgba(201,168,76,0.06)');
-    grd.addColorStop(0.7,'rgba(201,168,76,0.03)');
-    grd.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=grd;ctx.beginPath();ctx.arc(cx,cy,r*1.4,0,Math.PI*2);ctx.fill();
-    // Latitude lines
-    for(let lat=-75;lat<=75;lat+=25){
-      const y0=cy+r*Math.sin(lat*Math.PI/180)*0.6;
-      const rx=r*Math.cos(lat*Math.PI/180);
-      ctx.beginPath();ctx.ellipse(cx,y0,rx,rx*0.3,0,0,Math.PI*2);
-      ctx.strokeStyle='rgba(201,168,76,0.15)';ctx.lineWidth=0.7;ctx.stroke();
-    }
-    // Longitude lines
-    for(let lon=0;lon<180;lon+=30){
-      const a=(lon+time*8)*Math.PI/180;
-      ctx.beginPath();
-      for(let lat2=-90;lat2<=90;lat2+=5){
-        const ph=lat2*Math.PI/180;
-        const x2=cx+r*Math.cos(ph)*Math.cos(a);
-        const y2=cy+r*Math.sin(ph)*0.6;
-        lat2===-90?ctx.moveTo(x2,y2):ctx.lineTo(x2,y2);
-      }
-      ctx.strokeStyle='rgba(201,168,76,0.1)';ctx.lineWidth=0.7;ctx.stroke();
-    }
-    // Glowing dots on surface
-    for(let i=0;i<18;i++){
-      const phi=((i*137.5)%180)*Math.PI/180;
-      const theta=(i*97.3+time*15)*Math.PI/180;
-      const dx=r*Math.sin(phi)*Math.cos(theta);
-      const dy=r*Math.cos(phi)*0.6;
-      const pulse=0.5+Math.sin(time*2+i)*0.5;
-      ctx.beginPath();ctx.arc(cx+dx,cy+dy,3+pulse*2,0,Math.PI*2);
-      ctx.fillStyle=`rgba(201,168,76,${0.5+pulse*0.4})`;ctx.fill();
-    }
-    // "Always monitoring" label
-    ctx.fillStyle='rgba(240,236,230,0.3)';ctx.font='12px Segoe UI';
-    ctx.textAlign='center';ctx.textBaseline='top';
-    ctx.fillText('Always monitoring',cx,cy+r*0.7+20);
-  }
-
-  // ── SCENE 6 — GALAXY ─────────────────────────────────────────────────────
-  if(scene===5){
-    const cx=W/2,cy=H/2;
-    const armLabels=['Student','Founder','Trader','Executive','Restaurant'];
-    const armColors=['rgba(201,168,76,0.9)','rgba(240,236,230,0.9)','rgba(220,200,140,0.9)','rgba(201,180,100,0.9)','rgba(245,235,200,0.9)'];
-    armLabels.forEach((label,i)=>{
-      const angle=(i/5)*Math.PI*2+time*0.08;
-      const r=Math.min(W,H)*0.38;
-      const lx=cx+Math.cos(angle)*r;
-      const ly=cy+Math.sin(angle)*r*0.55;
-      ctx.fillStyle=armColors[i];
-      ctx.font='bold 13px Segoe UI';ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.shadowColor='rgba(201,168,76,0.6)';ctx.shadowBlur=8;
-      ctx.fillText(label,lx,ly);
-      ctx.shadowBlur=0;
-    });
-    // Center glow
-    const grd=ctx.createRadialGradient(cx,cy,0,cx,cy,60);
-    grd.addColorStop(0,'rgba(201,168,76,0.2)');
-    grd.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=grd;ctx.beginPath();ctx.arc(cx,cy,60,0,Math.PI*2);ctx.fill();
-  }
-
-  // ── SCENE 7 — CTA ────────────────────────────────────────────────────────
-  if(scene===6){
-    const cx=W/2,cy=H/2;
-    const pulse=0.5+Math.sin(time*1.5)*0.5;
-    // Expanding rings
-    for(let i=0;i<3;i++){
-      const rp=((time*0.3+i*0.33)%1);
-      const rr=40+rp*180;
-      const op=(1-rp)*0.4;
-      ctx.beginPath();ctx.arc(cx,cy,rr,0,Math.PI*2);
-      ctx.strokeStyle=`rgba(201,168,76,${op})`;ctx.lineWidth=1.5;ctx.stroke();
-    }
-    // Center glow
-    const grd=ctx.createRadialGradient(cx,cy,0,cx,cy,80+pulse*20);
-    grd.addColorStop(0,'rgba(201,168,76,0.3)');
-    grd.addColorStop(0.5,'rgba(201,168,76,0.1)');
-    grd.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=grd;ctx.beginPath();ctx.arc(cx,cy,80+pulse*20,0,Math.PI*2);ctx.fill();
-    // Center sphere
-    ctx.beginPath();ctx.arc(cx,cy,18+pulse*4,0,Math.PI*2);
-    ctx.fillStyle=`rgba(201,168,76,${0.7+pulse*0.2})`;ctx.fill();
-    ctx.fillStyle='rgba(10,8,6,0.9)';ctx.font='bold 9px Segoe UI';
-    ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText('ATLAS',cx,cy);
-  }
-
-  updateOverlays(scene,prog);
-}
-
-draw();
-
-// ── REVEAL ────────────────────────────────────────────────────────────────────
-const obs=new IntersectionObserver(e=>{e.forEach(e=>{if(e.isIntersecting)e.target.classList.add('v');});},{threshold:0.1});
-document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
-</script>
-
-<!-- ── WAITLIST (added: posts to /api/waitlist) ─────────────────────────────── -->
-<script>
-(function(){
-  var GOLD='#c9a84c', DARK='#1a1a1a', CREAM='#f0ece6';
-  var overlay=null;
-
-  function close(){ if(overlay){ overlay.remove(); overlay=null; } }
-
-  window.atlasWaitlist=function(){
-    if(overlay) return;
-    overlay=document.createElement('div');
-    overlay.style.cssText='position:fixed;inset:0;background:rgba(10,8,6,0.82);backdrop-filter:blur(6px);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px;font-family:inherit';
-    overlay.innerHTML=
-      '<div id="wl-card" style="background:'+CREAM+';border-radius:24px;padding:36px;max-width:440px;width:100%;box-shadow:0 30px 80px rgba(0,0,0,0.5)">'+
-        '<h3 style="margin:0 0 8px;font-size:24px;font-weight:700;color:'+DARK+';letter-spacing:-0.5px">Join the waitlist</h3>'+
-        '<p style="margin:0 0 22px;font-size:14px;line-height:1.6;color:rgba(26,26,26,0.55)">We&rsquo;ll email you when spots open.</p>'+
-        '<input id="wl-email" type="email" placeholder="your@email.com" autocomplete="email" '+
-          'style="width:100%;padding:15px 18px;border-radius:100px;border:1px solid rgba(26,26,26,0.18);background:#fff;font-size:15px;outline:none;font-family:inherit;color:'+DARK+'"/>'+
-        '<p id="wl-msg" style="min-height:20px;margin:12px 0 0;font-size:13px;color:'+GOLD+'"></p>'+
-        '<div style="display:flex;gap:10px;margin-top:14px">'+
-          '<button id="wl-cancel" style="flex:1;padding:15px;border-radius:100px;border:1px solid rgba(26,26,26,0.18);background:transparent;color:rgba(26,26,26,0.6);font-size:13px;cursor:pointer;font-family:inherit">Cancel</button>'+
-          '<button id="wl-go" style="flex:2;padding:15px;border-radius:100px;border:none;background:'+DARK+';color:'+CREAM+';font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-family:inherit">Join Waitlist</button>'+
-        '</div>'+
-      '</div>';
-    document.body.appendChild(overlay);
-
-    var input=overlay.querySelector('#wl-email');
-    var msg=overlay.querySelector('#wl-msg');
-    var go=overlay.querySelector('#wl-go');
-
-    input.focus();
-    overlay.addEventListener('click',function(e){ if(e.target===overlay) close(); });
-    overlay.querySelector('#wl-cancel').addEventListener('click',close);
-    input.addEventListener('keydown',function(e){ if(e.key==='Enter') submit(); });
-    go.addEventListener('click',submit);
-
-    function submit(){
-      var email=(input.value||'').trim();
-      if(!email||email.indexOf('@')===-1){
-        msg.textContent='Please enter a valid email address.';
-        msg.style.color='#c0392b';
-        return;
-      }
-      msg.textContent='Adding you…';
-      msg.style.color=GOLD;
-      go.disabled=true;
-
-      fetch('/api/waitlist',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({email:email,source:'wow-landing'})
-      })
-      .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,data:d}; }); })
-      .then(function(res){
-        go.disabled=false;
-        if(!res.ok){
-          msg.textContent=res.data.error||'Something went wrong.';
-          msg.style.color='#c0392b';
-          return;
-        }
-        msg.textContent=res.data.message||"You're on the list.";
-        msg.style.color='#2e7d32';
-        input.value='';
-        setTimeout(close,2200);
-      })
-      .catch(function(){
-        go.disabled=false;
-        msg.textContent='Could not reach the server. Please try again.';
-        msg.style.color='#c0392b';
-      });
-    }
-  };
-
-  document.addEventListener('keydown',function(e){ if(e.key==='Escape') close(); });
+  fetch('/api/atlas/agents')
+    .then(function(r){ return r.ok?r.json():null; })
+    .then(function(d){
+      if(!d||!d.live||!d.planned) return;
+      var trim=function(s){ return String(s).replace(/\s*Agent$/,''); };
+      render(
+        d.live.map(function(a){ return trim(a.name); }),
+        d.planned.map(function(a){
+          return [trim(a.name), a.needs==='configuration' ? 'needs connecting' : a.needs];
+        })
+      );
+    })
+    .catch(function(){});
 })();
+
+/* ── waitlist ─────────────────────────────────────────────────────────────── */
+var wl=document.getElementById('wl');
+function openWL(){ wl.classList.add('on'); setTimeout(function(){ document.getElementById('wlEmail').focus(); },60); }
+function closeWL(){ wl.classList.remove('on'); document.getElementById('wlMsg').textContent=''; }
+addEventListener('keydown',function(e){ if(e.key==='Escape') closeWL(); });
+
+document.getElementById('wlGo').addEventListener('click',submitWL);
+document.getElementById('wlEmail').addEventListener('keydown',function(e){ if(e.key==='Enter') submitWL(); });
+
+function submitWL(){
+  var input=document.getElementById('wlEmail'), msg=document.getElementById('wlMsg');
+  var email=(input.value||'').trim();
+  if(!email||email.indexOf('@')===-1){ msg.textContent='Please enter a valid email address.'; msg.style.color='#a33'; return; }
+  msg.textContent='Adding you…'; msg.style.color='var(--gold)';
+  fetch('/api/waitlist',{method:'POST',headers:{'Content-Type':'application/json'},
+                         body:JSON.stringify({email:email,source:'landing'})})
+    .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+    .then(function(res){
+      msg.textContent = res.ok ? (res.d.message||"You're on the list.") : (res.d.error||'Something went wrong.');
+      msg.style.color = res.ok ? 'var(--green)' : '#a33';
+      if(res.ok){ input.value=''; setTimeout(closeWL,2200); }
+    })
+    .catch(function(){ msg.textContent='Could not reach the server.'; msg.style.color='#a33'; });
+}
 </script>
 </body>
 </html>
