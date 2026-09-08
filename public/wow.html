@@ -16,6 +16,9 @@ html, body { background:#0a0806; color:#1a1a1a; font-family:'Segoe UI','Helvetic
             dark->light flash before the image decoded. */
          background:#efe9e0; }
 #c { position:absolute; top:0; left:0; width:100%; height:100%; }
+#heroSeq { position:absolute; top:-10%; left:-10%; width:120%; height:120%;
+           opacity:0; transition:opacity 0.45s ease; will-change:transform,opacity;
+           transform-origin:center center; pointer-events:none; }
 #hero-img { position:absolute; top:-10%; left:-10%; width:120%; height:120%; background-image:url('atlas-hero.png'); background-size:cover; background-position:20% center; transform-origin:center center; will-change:transform; }
 #cur { position:fixed; width:10px; height:10px; background:#c9a84c; border-radius:50%; pointer-events:none; z-index:9999; transform:translate(-50%,-50%); }
 #cur-ring { position:fixed; width:40px; height:40px; border:1px solid rgba(201,168,76,0.3); border-radius:50%; pointer-events:none; z-index:9998; transform:translate(-50%,-50%); }
@@ -177,6 +180,10 @@ nav.dark .nbtn { background:rgba(201,168,76,0.9); color:#1a1a1a; }
 
 <div id="stage">
   <div id="hero-img"></div>
+  <!-- Scroll-scrubbed hero footage. Stays hidden until every frame has
+       decoded, so a slow connection or a 404 leaves the static hero image
+       in place rather than a blank stage. -->
+  <canvas id="heroSeq"></canvas>
   <canvas id="c"></canvas>
 
   <div class="scene-overlay" id="sc1">
@@ -515,6 +522,68 @@ const taskCards=[
 const cardTriggers=[0.1,0.25,0.4,0.55,0.7,0.85];
 
 // ── DRAW ──────────────────────────────────────────────────────────────────────
+// ── HERO FRAME SEQUENCE ──────────────────────────────────────────────────────
+// 72 WebP frames of a camera arc, scrubbed against scroll position. Roughly
+// 1.2MB in total — lighter than the single hero PNG it sits on top of.
+//
+// The static hero image stays visible until every frame has decoded. If any of
+// them fail, heroSeqReady never flips and the page renders exactly as it did
+// before, which matters because an invisible hero is the bug this page already
+// had once.
+const HERO_FRAMES=72;
+const heroImgs=[];
+let heroSeqLoaded=0, heroSeqReady=false, heroSeqFailed=false;
+const heroCanvas=document.getElementById('heroSeq');
+const heroCtx=heroCanvas.getContext('2d');
+
+(function preloadHero(){
+  for(let i=1;i<=HERO_FRAMES;i++){
+    const im=new Image();
+    im.decoding='async';
+    im.onload=()=>{
+      if(++heroSeqLoaded===HERO_FRAMES){
+        heroSeqReady=true;
+        heroCanvas.style.opacity='1';
+        const hi=document.getElementById('hero-img');
+        if(hi) hi.style.opacity='0';
+      }
+    };
+    im.onerror=()=>{ heroSeqFailed=true; };
+    im.src='hero-seq/f_'+String(i).padStart(3,'0')+'.webp';
+    heroImgs.push(im);
+  }
+})();
+
+function sizeHeroCanvas(){
+  const r=heroCanvas.getBoundingClientRect();
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  heroCanvas.width=Math.max(1,Math.round(r.width*dpr));
+  heroCanvas.height=Math.max(1,Math.round(r.height*dpr));
+}
+window.addEventListener('resize',()=>{ sizeHeroCanvas(); lastHeroFrame=-1; });
+sizeHeroCanvas();
+
+// Cover-fit: fill the box, crop the overflow, never letterbox.
+//
+// Redraws only when the frame index actually changes. The scrubber advances a
+// frame roughly every 1.6vh of scroll, so at 60fps the great majority of calls
+// would otherwise re-upscale an identical image for nothing — that alone cost
+// ~3.3ms per frame, the most expensive thing on the page.
+let lastHeroFrame=-1, lastHeroW=0, lastHeroH=0;
+function drawHeroFrame(idx){
+  const im=heroImgs[idx];
+  if(!im||!im.complete||!im.naturalWidth) return;
+  if(idx===lastHeroFrame && heroCanvas.width===lastHeroW && heroCanvas.height===lastHeroH) return;
+  lastHeroFrame=idx; lastHeroW=heroCanvas.width; lastHeroH=heroCanvas.height;
+  const cw=heroCanvas.width, ch=heroCanvas.height;
+  if(!cw||!ch) return;
+  const ar=im.naturalWidth/im.naturalHeight, boxAr=cw/ch;
+  let dw,dh;
+  if(ar>boxAr){ dh=ch; dw=ch*ar; } else { dw=cw; dh=cw/ar; }
+  heroCtx.clearRect(0,0,cw,ch);
+  heroCtx.drawImage(im,(cw-dw)/2,(ch-dh)/2,dw,dh);
+}
+
 // ── HERO ORBIT SHELL ─────────────────────────────────────────────────────────
 // A shell of points on a sphere, distributed with the Fibonacci spiral so they
 // are evenly spaced rather than bunched at the poles. The hero art is a flat
@@ -569,17 +638,27 @@ function draw(){
   const heroImg=document.getElementById('hero-img');
   if(scene===0){
     const zoomProg=Math.min(1,gp/(0.14*0.43)); // reaches 1.0 at 6% of total
-    const scale=lerp(1.02,1.24,zoomProg);
-    // Lateral drift plus a fraction of a degree of roll. On its own a straight
-    // zoom reads as a static photo being enlarged; adding the sideways travel
-    // and roll makes it read as a camera arcing past the subject.
-    const arc=lerp(-2.2,2.2,prog);
-    const roll=lerp(-0.55,0.55,prog);
-    heroImg.style.transform=`translate3d(${arc}%,${-arc*0.14}%,0) rotate(${roll}deg) scale(${scale})`;
-    heroImg.style.opacity=prog>0.7?lerp(1,0,(prog-0.7)/0.3):1;
+    const fade=prog>0.7?lerp(1,0,(prog-0.7)/0.3):1;
+
+    if(heroSeqReady){
+      // The footage already contains the camera arc, so the transform here is
+      // only a gentle push-in. Re-applying the old lateral drift and roll on top
+      // would double up the movement and read as a wobble.
+      drawHeroFrame(Math.min(HERO_FRAMES-1,Math.round(prog*(HERO_FRAMES-1))));
+      heroCanvas.style.transform=`scale(${lerp(1.0,1.07,zoomProg)})`;
+      heroCanvas.style.opacity=fade;
+    } else {
+      // Fallback path: the original CSS-driven camera arc on the still image.
+      const scale=lerp(1.02,1.24,zoomProg);
+      const arc=lerp(-2.2,2.2,prog);
+      const roll=lerp(-0.55,0.55,prog);
+      heroImg.style.transform=`translate3d(${arc}%,${-arc*0.14}%,0) rotate(${roll}deg) scale(${scale})`;
+      heroImg.style.opacity=fade;
+    }
   } else {
     heroImg.style.opacity='0';
     heroImg.style.transform='scale(1.18)';
+    if(heroSeqReady) heroCanvas.style.opacity='0';
   }
 
   // ── BACKGROUND ────────────────────────────────────────────────────────────
